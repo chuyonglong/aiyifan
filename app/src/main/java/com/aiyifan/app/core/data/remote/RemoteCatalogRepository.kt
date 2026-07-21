@@ -8,6 +8,7 @@ import com.aiyifan.app.core.model.Episode
 import com.aiyifan.app.core.model.FavoriteVideo
 import com.aiyifan.app.core.model.PlaybackLanguage
 import com.aiyifan.app.core.model.PlaybackQuality
+import com.aiyifan.app.core.model.SearchSuggestion
 import com.aiyifan.app.core.model.VideoDetail
 import com.aiyifan.app.core.model.VideoSummary
 import com.aiyifan.app.core.model.WatchHistory
@@ -64,24 +65,27 @@ class RemoteCatalogRepository(
             fallback.getHotVideos()
         }
 
-    override suspend fun searchVideos(keyword: String): List<VideoSummary> =
-        try {
-            val query = keyword.trim()
-            if (query.isEmpty()) {
-                emptyList()
-            } else {
-                ensureSections()
-                    .flatMap { it.videos }
-                    .distinctBy { it.mediaKey }
-                    .filter { video ->
-                        video.title.contains(query, ignoreCase = true) ||
-                            video.actor.orEmpty().contains(query, ignoreCase = true) ||
-                            video.director.orEmpty().contains(query, ignoreCase = true)
-                    }
-            }
+    override suspend fun searchVideos(keyword: String): List<VideoSummary> {
+        val query = keyword.trim()
+        if (query.isEmpty()) return emptyList()
+        return runCatching { searchRemoteVideos(query) }
+            .getOrDefault(emptyList())
+            .ifEmpty { searchCachedVideos(query) }
+            .ifEmpty { fallback.searchVideos(query) }
+    }
+
+    override suspend fun searchSuggestions(keyword: String): List<SearchSuggestion> {
+        val query = keyword.trim()
+        if (query.isEmpty()) return emptyList()
+        return try {
+            val baseUrl = configResolver.resolveBaseUrl()
+            val response = fetcher.get(buildUrl(baseUrl, "api/Home/GetKeyWord", mapOf("keyword" to query)))
+            if (response.code !in 200..299) throw IllegalStateException("Suggest failed: ${response.code}")
+            parseSearchSuggestions(response.body, query)
         } catch (_: Throwable) {
-            fallback.searchVideos(keyword)
+            localSuggestions(query)
         }
+    }
 
     override suspend fun getVideoDetail(mediaKey: String): VideoDetail {
         detailCache[mediaKey]?.let { return it }
@@ -278,6 +282,120 @@ class RemoteCatalogRepository(
         )
     }
 
+    private suspend fun searchRemoteVideos(query: String): List<VideoSummary> {
+        val baseUrl = configResolver.resolveBaseUrl()
+        val response = fetcher.get(
+            buildUrl(
+                baseUrl,
+                "api/Search/GetSearch",
+                linkedMapOf("keyword" to query, "region" to DEFAULT_REGION),
+            ),
+        )
+        if (response.code !in 200..299) throw IllegalStateException("Search failed: ${response.code}")
+        val payload = JSONObject(response.body)
+        if (payload.optInt("ret", 200) != 200) throw IllegalStateException("Search service returned an error")
+        return parseSearchVideos(payload)
+    }
+
+    private suspend fun searchCachedVideos(query: String): List<VideoSummary> =
+        try {
+            ensureSections()
+                .flatMap { it.videos }
+                .distinctBy { it.mediaKey }
+                .filter { video -> video.matchesSearch(query) }
+        } catch (_: Throwable) {
+            emptyList()
+        }
+
+    private fun parseSearchVideos(payload: JSONObject): List<VideoSummary> {
+        val data = payload.opt("data")
+        val items = when (data) {
+            is JSONArray -> data
+            is JSONObject -> data.optJSONArray("list")
+                ?: data.optJSONArray("videoList")
+                ?: data.optJSONArray("items")
+                ?: JSONArray()
+            else -> JSONArray()
+        }
+        return buildList {
+            for (index in 0 until items.length()) {
+                val item = items.optJSONObject(index) ?: continue
+                val mediaKey = item.optString("mediaKey").trim().ifBlank { item.optString("videoKey").trim() }
+                if (mediaKey.isBlank()) continue
+                val publishTime = item.optString("publishTime").trim()
+                add(
+                    VideoSummary(
+                        mediaKey = mediaKey,
+                        episodeKey = item.optString("episodeKey").trim().ifBlank { null },
+                        title = item.optString("title").trim(),
+                        coverUrl = item.optString("coverImgUrl").trim(),
+                        videoType = item.optInt("videoType", item.optInt("type", 0)),
+                        contentType = item.optString("contentType").trim().ifBlank { item.optString("typeName").trim().ifBlank { null } },
+                        score = item.optString("score").trim().ifBlank { null },
+                        playCount = item.optInt("playCount"),
+                        updateStatus = item.optString("updateStatus").trim().ifBlank { null },
+                        year = publishTime.takeIf { it.length >= 4 }?.take(4),
+                        area = item.optString("regional").trim().ifBlank { null },
+                        actor = item.optString("actor").trim().ifBlank { null },
+                        director = item.optString("director").trim().ifBlank { null },
+                    ),
+                )
+            }
+        }
+    }
+
+    private suspend fun localSuggestions(query: String): List<SearchSuggestion> =
+        try {
+            ensureSections()
+                .flatMap { it.videos }
+                .flatMap { video -> listOf(video.title, video.actor.orEmpty(), video.director.orEmpty()) }
+                .filter { value -> value.contains(query, ignoreCase = true) }
+                .distinct()
+                .take(8)
+                .map(::SearchSuggestion)
+        } catch (_: Throwable) {
+            fallback.searchSuggestions(query)
+        }
+
+    private fun parseSearchSuggestions(payload: String, query: String): List<SearchSuggestion> {
+        val data = JSONObject(payload).opt("data")
+        val items = when (data) {
+            is JSONArray -> data
+            is JSONObject -> data.optJSONArray("list") ?: data.optJSONArray("items") ?: JSONArray()
+            else -> JSONArray()
+        }
+        return buildList {
+            for (index in 0 until items.length()) {
+                val item = items.opt(index)
+                val value = when (item) {
+                    is String -> item
+                    is JSONObject -> item.optString("keyword")
+                        .ifBlank { item.optString("name") }
+                        .ifBlank { item.optString("title") }
+                    else -> ""
+                }.trim()
+                if (value.isNotBlank()) add(SearchSuggestion(value))
+            }
+        }.distinctBy { it.keyword }.take(8).ifEmpty { localSuggestionFallback(query) }
+    }
+
+    private fun localSuggestionFallback(query: String): List<SearchSuggestion> =
+        cachedSections.orEmpty()
+            .flatMap { it.videos }
+            .flatMap { video -> listOf(video.title, video.actor.orEmpty(), video.director.orEmpty()) }
+            .filter { value -> value.contains(query, ignoreCase = true) }
+            .distinct()
+            .take(8)
+            .map(::SearchSuggestion)
+
+    private fun VideoSummary.matchesSearch(query: String): Boolean =
+        title.contains(query, ignoreCase = true) ||
+            contentType.orEmpty().contains(query, ignoreCase = true) ||
+            area.orEmpty().contains(query, ignoreCase = true) ||
+            year.orEmpty().contains(query, ignoreCase = true) ||
+            actor.orEmpty().contains(query, ignoreCase = true) ||
+            director.orEmpty().contains(query, ignoreCase = true)
+
     private fun buildUrl(baseUrl: String, path: String, params: Map<String, String>): String {
         if (params.isEmpty()) return "$baseUrl$path"
         val query = params.entries.joinToString("&") { (key, value) ->
@@ -287,4 +405,8 @@ class RemoteCatalogRepository(
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
+
+    private companion object {
+        const val DEFAULT_REGION = "cn"
+    }
 }

@@ -21,7 +21,7 @@ android {
         create("release") {
             keyAlias = "aiyifan"
             keyPassword = "aiyifan"
-            storeFile = file("../aiyifan.jks")
+            storeFile = file("aiyifan.jks")
             storePassword = "aiyifan"
         }
     }

@@ -6,6 +6,7 @@ import com.aiyifan.app.core.model.Episode
 import com.aiyifan.app.core.model.FavoriteVideo
 import com.aiyifan.app.core.model.PlaybackLanguage
 import com.aiyifan.app.core.model.PlaybackQuality
+import com.aiyifan.app.core.model.SearchSuggestion
 import com.aiyifan.app.core.model.VideoDetail
 import com.aiyifan.app.core.model.VideoSummary
 import com.aiyifan.app.core.model.WatchHistory
@@ -104,9 +105,23 @@ class FakeCatalogRepository(
         if (query.isEmpty()) return emptyList()
         return summaries.filter {
             it.title.contains(query, ignoreCase = true) ||
+                it.contentType.orEmpty().contains(query, ignoreCase = true) ||
+                it.area.orEmpty().contains(query, ignoreCase = true) ||
+                it.year.orEmpty().contains(query, ignoreCase = true) ||
                 it.actor.orEmpty().contains(query, ignoreCase = true) ||
                 it.director.orEmpty().contains(query, ignoreCase = true)
         }
+    }
+
+    override suspend fun searchSuggestions(keyword: String): List<SearchSuggestion> {
+        val query = keyword.trim()
+        if (query.isEmpty()) return emptyList()
+        return summaries
+            .flatMap { listOf(it.title, it.actor.orEmpty(), it.director.orEmpty()) }
+            .filter { it.contains(query, ignoreCase = true) }
+            .distinct()
+            .take(8)
+            .map(::SearchSuggestion)
     }
 
     override suspend fun getVideoDetail(mediaKey: String): VideoDetail {

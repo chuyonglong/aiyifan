@@ -25,6 +25,10 @@ data class VideoSummary(
     val director: String? = null,
 )
 
+data class SearchSuggestion(
+    val keyword: String,
+)
+
 data class Episode(
     val episodeKey: String,
     val episodeTitle: String,

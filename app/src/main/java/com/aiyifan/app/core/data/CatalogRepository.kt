@@ -4,6 +4,7 @@ import com.aiyifan.app.core.model.Category
 import com.aiyifan.app.core.model.Comment
 import com.aiyifan.app.core.model.Episode
 import com.aiyifan.app.core.model.FavoriteVideo
+import com.aiyifan.app.core.model.SearchSuggestion
 import com.aiyifan.app.core.model.VideoDetail
 import com.aiyifan.app.core.model.VideoSummary
 import com.aiyifan.app.core.model.WatchHistory
@@ -16,6 +17,8 @@ interface CatalogRepository {
     suspend fun getHotVideos(): List<VideoSummary>
 
     suspend fun searchVideos(keyword: String): List<VideoSummary>
+
+    suspend fun searchSuggestions(keyword: String): List<SearchSuggestion>
 
     suspend fun getVideoDetail(mediaKey: String): VideoDetail
 

@@ -1,73 +1,73 @@
-# Video picture-in-picture and floating-window design
+# 视频画中画与悬浮窗设计
 
-## Goal
+## 目标
 
-Extend `VideoPlayerActivity` so that ongoing playback can continue in either Android system picture-in-picture (PiP) or an app-managed floating window. Playback position, selected episode, and play/pause state must survive transitions between the player page, PiP, and the overlay.
+扩展 `VideoPlayerActivity`，使正在播放的视频可切换至 Android 系统画中画（PiP）或应用内悬浮窗。播放器页面、系统画中画和悬浮窗之间切换时，须保留选集、播放进度与播放/暂停状态。
 
-## Scope
+## 范围
 
-- Add an explicit full-screen control that switches the player activity between portrait and landscape. Back exits full-screen before leaving the player page.
-- Prefer Android system PiP when the user leaves an actively playing video and the device supports PiP.
-- Supply play and pause actions in PiP through a MediaSession.
-- Support a custom floating window as a fallback when PiP is unavailable or disabled, and when the user deliberately chooses it.
-- Request `SYSTEM_ALERT_WINDOW` only when the floating-window path is first used.
-- Let the floating window be dragged and resized, with play/pause and close controls.
-- Persist history and release the player when playback is closed from any presentation.
+- 新增明确的全屏控制：在竖屏与横屏之间切换；横屏状态下按返回键优先退出全屏。
+- 用户离开正在播放的视频页时，设备支持则优先进入 Android 系统画中画。
+- 通过 `MediaSession` 为系统画中画提供播放与暂停操作。
+- 当系统画中画不可用、被关闭，或用户主动选择时，提供应用内悬浮窗兜底。
+- 仅在首次使用悬浮窗时申请 `SYSTEM_ALERT_WINDOW` 权限。
+- 应用内悬浮窗支持拖动、缩放、播放/暂停和关闭。
+- 从任一展示形态关闭播放时，保存历史记录并释放播放器。
 
-## Architecture
+## 架构
 
-### Playback owner
+### 播放器所有权
 
-Introduce one playback coordinator as the single owner of the Media3 `ExoPlayer`, selected episode, playback position, and play state. The coordinator exposes attach/detach operations for three presentation surfaces:
+引入单一播放协调器，统一持有 Media3 `ExoPlayer`、当前选集、播放进度和播放状态。协调器为以下三类展示容器提供挂载与解绑操作：
 
-1. `VideoPlayerActivity` owns the normal and full-screen page UI.
-2. Android PiP reuses the activity and its attached `PlayerView`.
-3. A foreground media service owns the app overlay and its attached `PlayerView` while the activity is no longer visible.
+1. `VideoPlayerActivity`：承载普通与全屏播放页。
+2. Android 系统画中画：复用 Activity 及已挂载的 `PlayerView`。
+3. 前台媒体服务：当 Activity 不可见时，承载应用内悬浮窗及其 `PlayerView`。
 
-The player must never be attached to more than one `PlayerView` at a time. Any surface transition detaches first, attaches the next surface, and then restores the captured playback state.
+同一时刻播放器只能挂载到一个 `PlayerView`。切换展示容器时，先解绑旧容器，再挂载新容器，并恢复已保存的播放状态。
 
-### System picture-in-picture
+### 系统画中画
 
-The activity declares PiP support in the manifest. When a playable video is currently playing and the activity is about to leave the foreground, it enters PiP with a 16:9 aspect ratio. The MediaSession publishes play/pause actions, so the system PiP controls can pause and resume playback. Android controls PiP resizing; the app does not implement its own resize gesture in this mode.
+Activity 在清单文件中声明支持画中画。正在播放的可用视频离开前台时，以 16:9 比例进入画中画。`MediaSession` 发布播放/暂停操作，使系统画中画控制栏可暂停或恢复播放。画中画缩放由 Android 系统处理，应用不在该模式自行实现缩放手势。
 
-Entering PiP hides page-only controls and content. Returning from PiP restores the normal activity surface without restarting the stream or losing position. If PiP is unsupported, unavailable, or fails to enter, the app proceeds to the overlay fallback only when overlay permission has already been granted; otherwise it remains on the normal close/background path.
+进入画中画后隐藏仅属于详情页的内容与控制；从画中画返回应用时恢复普通播放页，不重启流媒体、不丢失进度。画中画不支持、不可用或进入失败时，仅在已拥有悬浮窗权限的情况下转入悬浮窗兜底；否则按普通离开页面/后台流程处理。
 
-### Floating window
+### 应用内悬浮窗
 
-The first explicit request to use the floating window checks `Settings.canDrawOverlays`. If absent, the app opens Android's per-app overlay-permission screen and explains that the feature cannot start until permission is granted. A denial never blocks normal playback or system PiP.
+用户首次明确要求使用悬浮窗时，先通过 `Settings.canDrawOverlays` 检查权限。未授权时，打开 Android 的应用级悬浮窗授权页面，并说明授权完成前无法开启该功能。用户拒绝授权不会影响普通播放和系统画中画。
 
-After authorization, a foreground service with media-playback notification owns a `WindowManager` overlay. The window contains a Media3 `PlayerView`, play/pause control, and close control. Drag gestures move the window; a dedicated resize handle changes its width and height within screen-safe minimum and maximum bounds while preserving a 16:9 content ratio. The service keeps playback active after the activity is hidden.
+获得授权后，前台媒体服务通过 `WindowManager` 创建悬浮窗。窗口包含 Media3 `PlayerView`、播放/暂停按钮和关闭按钮。拖动手势移动窗口；专用缩放手柄在屏幕安全范围内调整窗口尺寸，同时保持 16:9 内容比例。Activity 隐藏后，服务继续维持播放。
 
-Close stops playback, saves history, removes the window, stops the foreground service, and releases the player. If the permission is revoked or the service fails, the app removes the overlay safely and stops playback with a user-visible message.
+关闭悬浮窗时停止播放、保存历史、移除窗口、停止前台服务并释放播放器。权限被撤销或服务异常时，应用安全移除悬浮窗并停止播放，同时向用户提示。
 
-## Interaction rules
+## 交互规则
 
-- Full-screen toggles the activity orientation. Back in landscape returns to portrait; otherwise Back uses normal navigation.
-- Leaving an actively playing player page prefers system PiP.
-- PiP supports play/pause and system-provided resizing.
-- The overlay is selected intentionally by the user or used only after PiP is unavailable/disabled and permission is granted.
-- The overlay supports drag, resize, play/pause, and close.
-- Paused, unprepared, errored, or streamless media never enters PiP automatically.
-- Current episode, progress, and play state survive all valid surface transitions.
-- The app records progress when a player surface stops and performs final save/release on explicit close or terminal failure.
+- 全屏按钮切换 Activity 方向；横屏时按返回键恢复竖屏，竖屏时返回键按正常导航处理。
+- 离开正在播放的播放器页时，优先尝试进入系统画中画。
+- 系统画中画支持播放/暂停，并使用系统提供的缩放能力。
+- 用户可主动选择悬浮窗；只有系统画中画不可用或关闭且已经授权时，才自动使用悬浮窗兜底。
+- 应用内悬浮窗支持拖动、缩放、播放/暂停和关闭。
+- 暂停、未准备完成、播放出错或没有可播放地址的视频，不会自动进入系统画中画。
+- 所有合法展示形态转换均保留当前选集、进度和播放状态。
+- 播放容器停止时记录进度；显式关闭或发生终止性错误时执行最终保存并释放资源。
 
-## Error handling
+## 异常处理
 
-- A missing media URL shows the existing playback error and never exposes PiP or overlay controls.
-- Failed PiP entry leaves the page usable; it must not release or restart the player.
-- Denied overlay permission explains the limitation and keeps PiP and normal playback available.
-- Revoked overlay permission, failed service startup, or failed window attachment removes any partial UI, saves progress, and stops playback cleanly.
-- The player must be released exactly once after an explicit overlay close, page close without PiP, or terminal failure.
+- 播放地址为空时，显示既有播放错误，且不展示画中画或悬浮窗入口。
+- 进入系统画中画失败后，播放器页必须仍可正常使用，且不得释放或重启播放器。
+- 悬浮窗权限被拒绝时，说明功能限制，保留系统画中画和普通播放。
+- 悬浮窗权限被撤销、服务启动失败或窗口挂载失败时，移除不完整界面、保存进度并安全停止播放。
+- 悬浮窗显式关闭、未进入画中画即离开页面、或发生终止性错误时，播放器只能被释放一次。
 
-## Tests and acceptance criteria
+## 测试与验收条件
 
-- Unit tests cover presentation-state decisions: PiP eligibility, overlay permission gating, fallback selection, and full-screen back behavior.
-- Instrumented tests validate activity PiP configuration and overlay service intent construction where platform APIs permit.
-- Manual device validation verifies PiP play/pause and system resizing, overlay authorization, dragging, ratio-preserving resizing, closing, full-screen transitions, and uninterrupted progress/episode continuity across each transition.
-- Existing player loading, episode switching, history, favorite, sharing, related content, and comments continue to work.
+- 单元测试覆盖展示状态决策：画中画进入条件、悬浮窗权限门控、兜底路径选择、全屏返回键行为。
+- 在平台 API 允许的范围内，仪器测试验证 Activity 的画中画配置和悬浮窗服务 Intent 构造。
+- 在真机上人工验证：画中画的播放/暂停与系统缩放、悬浮窗授权、拖动、保持比例缩放、关闭，以及各种展示形态之间的选集与进度连续性。
+- 既有的视频加载、选集、播放历史、收藏、分享、相关推荐和评论功能继续正常工作。
 
-## Non-goals
+## 非目标
 
-- Custom resizing of Android's system PiP window.
-- A background player without an active PiP window or authorized foreground overlay.
-- Casting, ads, subtitles, quality selection, or other player features unrelated to PiP and floating windows.
+- 自行实现 Android 系统画中画窗口的缩放手势。
+- 未显示系统画中画窗口、且未获得前台悬浮窗授权时的后台播放。
+- 投屏、广告、字幕、清晰度选择及其他与画中画和悬浮窗无关的播放器功能。

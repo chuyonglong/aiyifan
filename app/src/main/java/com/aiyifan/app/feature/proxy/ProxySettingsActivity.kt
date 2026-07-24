@@ -1,10 +1,15 @@
 package com.aiyifan.app.feature.proxy
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.aiyifan.app.core.data.AppGraph
 import com.aiyifan.app.core.ui.applySystemBarsPadding
@@ -52,6 +57,7 @@ class ProxySettingsActivity : AppCompatActivity() {
         binding.subscriptionEdit.setText(proxyManager.storedSubscriptionUrl().orEmpty())
         renderNodes()
         renderStatus()
+        restoreSavedSubscription()
     }
 
     override fun onResume() {
@@ -80,10 +86,27 @@ class ProxySettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun restoreSavedSubscription() {
+        val subscriptionUrl = proxyManager.storedSubscriptionUrl()?.trim().orEmpty()
+        if (subscriptionUrl.isEmpty()) return
+
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { proxyManager.refresh(subscriptionUrl) } }
+            result.getOrNull()?.let(::renderImportResult)
+        }
+    }
+
     private fun connect() {
         if (proxyManager.selectedNode == null) {
             binding.statusView.text = "\u8BF7\u5148\u66F4\u65B0\u8BA2\u9605\u5E76\u9009\u62E9\u8282\u70B9"
             return
+        }
+
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
         }
 
         setLoading(true)
@@ -159,4 +182,8 @@ class ProxySettingsActivity : AppCompatActivity() {
     }
 
     private fun nodeLabel(node: ProxyNode): String = "${node.displayName} (${node.protocol.name})"
+
+    private companion object {
+        const val REQUEST_NOTIFICATIONS = 4102
+    }
 }

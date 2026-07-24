@@ -7,6 +7,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.Proxy
 import java.net.URLEncoder
 import java.net.URL
 
@@ -20,14 +21,31 @@ data class HttpResponse(
 interface HttpFetcher {
     suspend fun get(url: String): HttpResponse
 
+    suspend fun getDirect(url: String): HttpResponse = get(url)
+
     suspend fun postForm(url: String, params: Map<String, String>): HttpResponse =
         throw UnsupportedOperationException("Form POST is not supported")
 }
 
-class UrlConnectionHttpFetcher : HttpFetcher {
+fun interface HttpConnectionOpener {
+    fun open(url: URL, proxy: Proxy?): HttpURLConnection
+}
+
+class UrlConnectionHttpFetcher(
+    private val endpointProvider: () -> LocalProxyEndpoint? = { null },
+    private val connectionOpener: HttpConnectionOpener = HttpConnectionOpener { url, proxy ->
+        (proxy?.let(url::openConnection) ?: url.openConnection()) as HttpURLConnection
+    },
+) : HttpFetcher {
     override suspend fun get(url: String): HttpResponse =
+        get(url, ProxyConnectionPolicy.select(endpointProvider()))
+
+    override suspend fun getDirect(url: String): HttpResponse =
+        get(url, proxy = null)
+
+    private suspend fun get(url: String, proxy: Proxy?): HttpResponse =
         withContext(Dispatchers.IO) {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val connection = connectionOpener.open(URL(url), proxy).apply {
                 requestMethod = "GET"
                 connectTimeout = 10_000
                 readTimeout = 10_000
@@ -54,7 +72,10 @@ class UrlConnectionHttpFetcher : HttpFetcher {
 
     override suspend fun postForm(url: String, params: Map<String, String>): HttpResponse =
         withContext(Dispatchers.IO) {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val connection = connectionOpener.open(
+                URL(url),
+                ProxyConnectionPolicy.select(endpointProvider()),
+            ).apply {
                 requestMethod = "POST"
                 connectTimeout = 10_000
                 readTimeout = 10_000

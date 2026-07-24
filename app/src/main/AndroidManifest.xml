@@ -3,7 +3,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
@@ -39,6 +41,14 @@
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
             android:exported="false"
             android:supportsPictureInPicture="true" />
+        <service
+            android:name=".feature.proxy.ProxyForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains a user-initiated local proxy for in-app media playback" />
+        </service>
         <service
             android:name=".feature.video.FloatingPlayerService"
             android:exported="false"

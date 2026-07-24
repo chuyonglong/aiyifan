@@ -52,7 +52,16 @@ class RemoteCatalogRepositorySearchTest {
                       "title": "远程命中",
                       "coverImgUrl": "https://example.com/remote.jpg",
                       "videoType": 1,
-                      "mediaType": "电影"
+                      "mediaType": "电影",
+                      "episodes": [
+                        {"episodeKey": "episode-1", "episodeTitle": "01", "episodeId": 1},
+                        {"episodeKey": "episode-2", "episodeTitle": "02", "episodeId": 2},
+                        {"episodeKey": "episode-3", "episodeTitle": "03", "episodeId": 3},
+                        {"episodeKey": "episode-4", "episodeTitle": "04", "episodeId": 4},
+                        {"episodeKey": "episode-5", "episodeTitle": "05", "episodeId": 5},
+                        {"episodeKey": "episode-6", "episodeTitle": "06", "episodeId": 6},
+                        {"episodeKey": "episode-7", "episodeTitle": "07", "episodeId": 7}
+                      ]
                     }
                   ]
                 }
@@ -62,6 +71,10 @@ class RemoteCatalogRepositorySearchTest {
         val results = repository.searchVideos("远程")
 
         assertEquals(listOf("remote-movie"), results.map { it.mediaKey })
+        assertEquals(
+            listOf("01", "02", "03", "04", "05", "06"),
+            results.single().episodePreviews.map { it.episodeTitle },
+        )
     }
 
     @Test

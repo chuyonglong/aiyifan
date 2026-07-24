@@ -20,6 +20,7 @@ local.properties
 /.gradle-user
 /.codebuddy
 /.superpowers
+/.worktrees
 CommitNoteAI.md
 /app/src/test/
 /apktool_6_base

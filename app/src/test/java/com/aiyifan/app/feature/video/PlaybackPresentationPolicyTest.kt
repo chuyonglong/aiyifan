@@ -72,4 +72,21 @@ class PlaybackPresentationPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun `in app mini player is used when PiP and overlay are unavailable`() {
+        assertEquals(
+            PlaybackDestination.IN_APP_MINI_PLAYER,
+            PlaybackPresentationPolicy.destinationWhenLeaving(
+                PlaybackCapabilities(
+                    hasPlayableMedia = true,
+                    isPrepared = true,
+                    isPlaying = true,
+                    supportsPictureInPicture = false,
+                    pictureInPictureEnabled = false,
+                    hasOverlayPermission = false,
+                ),
+            ),
+        )
+    }
 }

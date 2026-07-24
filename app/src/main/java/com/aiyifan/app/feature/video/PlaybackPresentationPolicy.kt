@@ -3,6 +3,7 @@ package com.aiyifan.app.feature.video
 enum class PlaybackDestination {
     PICTURE_IN_PICTURE,
     OVERLAY,
+    IN_APP_MINI_PLAYER,
     NONE,
 }
 
@@ -20,6 +21,20 @@ object PlaybackPresentationPolicy {
         !value.hasPlayableMedia || !value.isPrepared || !value.isPlaying -> PlaybackDestination.NONE
         value.supportsPictureInPicture && value.pictureInPictureEnabled -> PlaybackDestination.PICTURE_IN_PICTURE
         value.hasOverlayPermission -> PlaybackDestination.OVERLAY
-        else -> PlaybackDestination.NONE
+        else -> PlaybackDestination.IN_APP_MINI_PLAYER
+    }
+}
+
+enum class VideoPlayerBackAction {
+    EXIT_FULL_SCREEN,
+    MINIMIZE_TO_IN_APP_PLAYER,
+    NAVIGATE_UP,
+}
+
+object VideoPlayerBackBehavior {
+    fun action(isFullScreen: Boolean, canMinimizeInApp: Boolean): VideoPlayerBackAction = when {
+        isFullScreen -> VideoPlayerBackAction.EXIT_FULL_SCREEN
+        canMinimizeInApp -> VideoPlayerBackAction.MINIMIZE_TO_IN_APP_PLAYER
+        else -> VideoPlayerBackAction.NAVIGATE_UP
     }
 }

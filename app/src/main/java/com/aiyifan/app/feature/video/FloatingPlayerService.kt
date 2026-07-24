@@ -118,6 +118,7 @@ class FloatingPlayerService : Service() {
             runCatching { windowManager.removeView(root) }
         }
         if (controllerHolder.isInitialized()) {
+            FloatingPlayerRecovery.record(this, controller.currentPositionMs)
             controller.saveHistory()
             controller.release()
         }

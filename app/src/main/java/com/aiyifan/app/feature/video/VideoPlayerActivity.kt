@@ -1,16 +1,30 @@
 package com.aiyifan.app.feature.video
 
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.util.Rational
+import android.view.MotionEvent
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
+import com.aiyifan.app.R
 import com.aiyifan.app.core.data.AppGraph
 import com.aiyifan.app.core.model.Episode
 import com.aiyifan.app.core.model.VideoDetail
@@ -24,23 +38,50 @@ import kotlinx.coroutines.launch
 
 class VideoPlayerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityVideoPlayerBinding
-    private var player: ExoPlayer? = null
+    private val playbackController: VideoPlaybackController
+        get() = AppGraph.videoPlaybackController
     private var detail: VideoDetail? = null
     private var selectedEpisode: Episode? = null
     private var playingEpisode: Episode? = null
     private lateinit var episodeAdapter: EpisodeAdapter
+    private var isFullScreen = false
+    private var isInAppMiniPlayerVisible = false
+    private var restoreMiniPlayerOnStart = false
+    private var pendingFloatingRecoveryPositionMs: Long? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setupEdgeToEdge(lightSystemBars = false)
         binding = ActivityVideoPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.root.applySystemBarsPadding(left = true, right = true, bottom = true)
+        binding.pageContent.applySystemBarsPadding(left = true, right = true, bottom = true)
         binding.playerContainer.applySystemBarsPadding(top = true, growHeight = true)
 
-        binding.backButton.setOnClickListener { finish() }
+        binding.backButton.setOnClickListener { handleBack() }
+        binding.fullScreenButton.setOnClickListener { setFullScreen(!isFullScreen) }
+        binding.floatingWindowButton.setOnClickListener { showFloatingPresentation() }
+        binding.inAppMiniPlayPauseButton.setOnClickListener {
+            playbackController.togglePlayPause()
+            updateInAppMiniPlayPauseButton()
+        }
+        binding.inAppMiniCloseButton.setOnClickListener { closePlayback() }
+        binding.inAppMiniResizeHandle.setOnTouchListener(InAppMiniResizeTouchListener())
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                handleBack()
+            }
+        })
         setupStaticLists()
         loadDetail(intent.getStringExtra(EXTRA_MEDIA_KEY).orEmpty())
+    }
+
+    override fun onStart() {
+        super.onStart()
+        FloatingPlayerRecovery.consumePosition(this)?.let(::restorePlaybackAfterFloatingWindow)
+        if (restoreMiniPlayerOnStart && !isInPictureInPictureMode) {
+            restoreMiniPlayerOnStart = false
+            showInAppMiniPlayer()
+        }
     }
 
     private fun setupStaticLists() {
@@ -136,7 +177,13 @@ class VideoPlayerActivity : AppCompatActivity() {
             runCatching { AppGraph.catalogRepository.resolvePlayback(detail, episode) }
                 .onSuccess { playableEpisode ->
                     playingEpisode = playableEpisode
-                    setupPlayer(playableEpisode)
+                    val resumePositionMs = pendingFloatingRecoveryPositionMs ?: 0L
+                    if (playbackController.prepare(detail, playableEpisode, resumePositionMs)) {
+                        pendingFloatingRecoveryPositionMs = null
+                        attachPlayerToCurrentSurface()
+                    } else {
+                        Toast.makeText(this@VideoPlayerActivity, "No playable stream", Toast.LENGTH_SHORT).show()
+                    }
                     binding.meta.text = listOfNotNull(
                         detail.typeName,
                         detail.publishTime,
@@ -151,45 +198,220 @@ class VideoPlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupPlayer(episode: Episode) {
-        val mediaUrl = episode.mediaUrl
-        if (mediaUrl.isNullOrBlank()) {
-            Toast.makeText(this, "No playable stream", Toast.LENGTH_SHORT).show()
-            return
+    private fun attachPlayerToCurrentSurface() {
+        if (isInAppMiniPlayerVisible) {
+            playbackController.attach(binding.inAppMiniPlayerView)
+        } else {
+            playbackController.attach(binding.playerView)
         }
-        val newPlayer = player ?: ExoPlayer.Builder(this).build().also {
-            player = it
-            binding.playerView.player = it
-        }
-        newPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(mediaUrl)))
-        newPlayer.prepare()
-        newPlayer.playWhenReady = true
     }
 
-    override fun onStop() {
-        super.onStop()
-        val activeDetail = detail
-        val episode = playingEpisode ?: selectedEpisode
-        val activePlayer = player
-        if (activeDetail != null && episode != null && activePlayer != null) {
-            AppGraph.catalogRepository.saveHistory(
-                detail = activeDetail,
-                episode = episode,
-                progressMs = activePlayer.currentPosition.coerceAtLeast(0L),
-                durationMs = activePlayer.duration.coerceAtLeast(0L),
+    private fun handleBack() {
+        when (
+            VideoPlayerBackBehavior.action(
+                isFullScreen = isFullScreen,
+                canMinimizeInApp = currentDestination() == PlaybackDestination.IN_APP_MINI_PLAYER,
+            )
+        ) {
+            VideoPlayerBackAction.EXIT_FULL_SCREEN -> setFullScreen(false)
+            VideoPlayerBackAction.MINIMIZE_TO_IN_APP_PLAYER -> showInAppMiniPlayer()
+            VideoPlayerBackAction.NAVIGATE_UP -> closePlayback()
+        }
+    }
+
+    private fun setFullScreen(enabled: Boolean) {
+        isFullScreen = enabled
+        requestedOrientation = if (enabled) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        binding.fullScreenButton.setImageResource(
+            if (enabled) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen,
+        )
+        binding.fullScreenButton.contentDescription = if (enabled) "退出全屏" else "全屏播放"
+        WindowCompat.getInsetsController(window, binding.root).apply {
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (enabled) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
+        }
+        binding.contentScroll.isVisible = !enabled && !isInAppMiniPlayerVisible
+        (binding.playerContainer.layoutParams as LinearLayout.LayoutParams).apply {
+            height = if (enabled) 0 else dpToPx(NORMAL_PLAYER_HEIGHT_DP)
+            weight = if (enabled) 1f else 0f
+            binding.playerContainer.layoutParams = this
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        when (currentDestination()) {
+            PlaybackDestination.PICTURE_IN_PICTURE -> {
+                if (!enterSystemPictureInPicture()) {
+                    if (Settings.canDrawOverlays(this)) {
+                        startOverlayPlayer()
+                    } else {
+                        showInAppMiniPlayer()
+                    }
+                }
+            }
+
+            PlaybackDestination.OVERLAY -> startOverlayPlayer()
+            PlaybackDestination.IN_APP_MINI_PLAYER,
+            PlaybackDestination.NONE,
+            -> Unit
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+        binding.contentScroll.isVisible = !isInPictureInPictureMode && !isInAppMiniPlayerVisible && !isFullScreen
+        binding.fullScreenButton.isVisible = !isInPictureInPictureMode
+        binding.floatingWindowButton.isVisible = !isInPictureInPictureMode
+        binding.backButton.isVisible = !isInPictureInPictureMode
+    }
+
+    private fun enterSystemPictureInPicture(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        return runCatching {
+            enterPictureInPictureMode(
+                PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build(),
+            )
+        }.getOrDefault(false)
+    }
+
+    private fun showFloatingPresentation() {
+        if (Settings.canDrawOverlays(this)) {
+            startOverlayPlayer()
+        } else {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                ),
             )
         }
     }
 
+    private fun startOverlayPlayer() {
+        if (!Settings.canDrawOverlays(this)) return
+        ContextCompat.startForegroundService(this, FloatingPlayerService.intent(this))
+        moveTaskToBack(true)
+    }
+
+    private fun showInAppMiniPlayer() {
+        if (!playbackController.isPrepared) return
+        isInAppMiniPlayerVisible = true
+        binding.inAppMiniPlayer.isVisible = true
+        binding.contentScroll.isVisible = false
+        binding.playerContainer.isVisible = false
+        playbackController.attach(binding.inAppMiniPlayerView)
+        updateInAppMiniPlayPauseButton()
+    }
+
+    private fun updateInAppMiniPlayPauseButton() {
+        binding.inAppMiniPlayPauseButton.setImageResource(
+            if (playbackController.isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+        )
+        binding.inAppMiniPlayPauseButton.contentDescription = if (playbackController.isPlaying) "暂停播放" else "继续播放"
+    }
+
+    private fun restorePlaybackAfterFloatingWindow(positionMs: Long) {
+        val activeDetail = detail
+        val activeEpisode = playingEpisode
+        if (activeDetail == null || activeEpisode == null) {
+            pendingFloatingRecoveryPositionMs = positionMs
+            return
+        }
+        if (playbackController.prepare(activeDetail, activeEpisode, positionMs)) {
+            pendingFloatingRecoveryPositionMs = null
+            isInAppMiniPlayerVisible = false
+            binding.inAppMiniPlayer.isVisible = false
+            binding.playerContainer.isVisible = true
+            attachPlayerToCurrentSurface()
+        }
+    }
+
+    private fun currentDestination(): PlaybackDestination = PlaybackPresentationPolicy.destinationWhenLeaving(
+        PlaybackCapabilities(
+            hasPlayableMedia = playingEpisode?.mediaUrl?.isNotBlank() == true,
+            isPrepared = playbackController.isPrepared,
+            isPlaying = playbackController.isPlaying,
+            supportsPictureInPicture = supportsSystemPictureInPicture(),
+            pictureInPictureEnabled = supportsSystemPictureInPicture(),
+            hasOverlayPermission = Settings.canDrawOverlays(this),
+        ),
+    )
+
+    private fun supportsSystemPictureInPicture(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+    override fun onStop() {
+        super.onStop()
+        if (!isInPictureInPictureMode && isInAppMiniPlayerVisible && !isChangingConfigurations) {
+            restoreMiniPlayerOnStart = true
+            isInAppMiniPlayerVisible = false
+            binding.inAppMiniPlayer.isVisible = false
+            if (playbackController.isPlaying) playbackController.togglePlayPause()
+        }
+        playbackController.saveHistory()
+    }
+
     override fun onDestroy() {
         binding.playerView.player = null
-        player?.release()
-        player = null
+        binding.inAppMiniPlayerView.player = null
+        if (isFinishing && !isInPictureInPictureMode) {
+            playbackController.saveHistory()
+            playbackController.release()
+        }
         super.onDestroy()
+    }
+
+    private fun closePlayback() {
+        playbackController.saveHistory()
+        playbackController.release()
+        finish()
+    }
+
+    private fun dpToPx(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private inner class InAppMiniResizeTouchListener : View.OnTouchListener {
+        private var downRawX = 0f
+        private var initialWidth = 0
+
+        override fun onTouch(view: View, event: MotionEvent): Boolean {
+            val params = binding.inAppMiniPlayer.layoutParams as FrameLayout.LayoutParams
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX
+                    initialWidth = params.width
+                    return true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val maxWidth = (binding.root.width - dpToPx(IN_APP_MINI_MARGIN_DP * 2)).coerceAtLeast(dpToPx(IN_APP_MINI_MIN_WIDTH_DP))
+                    val size = FloatingWindowSizePolicy.resize(
+                        requestedWidth = initialWidth + (downRawX - event.rawX).toInt(),
+                        minWidth = dpToPx(IN_APP_MINI_MIN_WIDTH_DP),
+                        maxWidth = maxWidth,
+                    )
+                    params.width = size.width
+                    params.height = size.height
+                    binding.inAppMiniPlayer.layoutParams = params
+                    return true
+                }
+            }
+            return false
+        }
     }
 
     companion object {
         private const val EXTRA_MEDIA_KEY = "mediaKey"
+        private const val NORMAL_PLAYER_HEIGHT_DP = 211
+        private const val IN_APP_MINI_MIN_WIDTH_DP = 180
+        private const val IN_APP_MINI_MARGIN_DP = 16
 
         fun intent(context: Context, mediaKey: String): Intent =
             Intent(context, VideoPlayerActivity::class.java).putExtra(EXTRA_MEDIA_KEY, mediaKey)

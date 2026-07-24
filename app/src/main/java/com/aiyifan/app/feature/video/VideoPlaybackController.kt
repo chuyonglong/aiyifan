@@ -17,6 +17,8 @@ interface PlaybackEngine {
 
     fun prepare()
 
+    fun seekTo(positionMs: Long)
+
     fun play()
 
     fun pause()
@@ -50,12 +52,16 @@ class VideoPlaybackController(
     val isPlaying: Boolean
         get() = isPrepared && engine.isPlaying
 
-    fun prepare(detail: VideoDetail, episode: Episode): Boolean {
+    val currentPositionMs: Long
+        get() = if (released) 0L else engine.currentPosition.coerceAtLeast(0L)
+
+    fun prepare(detail: VideoDetail, episode: Episode, startPositionMs: Long = 0L): Boolean {
         val mediaUrl = episode.mediaUrl?.trim().orEmpty()
         if (released || mediaUrl.isBlank()) return false
 
         engine.setMediaUrl(mediaUrl)
         engine.prepare()
+        if (startPositionMs > 0L) engine.seekTo(startPositionMs)
         engine.play()
         activeDetail = detail
         activeEpisode = episode
@@ -149,6 +155,10 @@ private class Media3PlaybackEngine(
 
     override fun prepare() {
         player.prepare()
+    }
+
+    override fun seekTo(positionMs: Long) {
+        player.seekTo(positionMs)
     }
 
     override fun play() {

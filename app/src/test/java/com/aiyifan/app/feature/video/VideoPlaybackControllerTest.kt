@@ -71,6 +71,16 @@ class VideoPlaybackControllerTest {
         assertEquals(67_890L, history.durationMs)
     }
 
+    @Test
+    fun `prepare resumes from the supplied playback position`() {
+        val engine = FakePlaybackEngine()
+        val controller = VideoPlaybackController(engine, FakeCatalogRepository(), FakePlaybackSession())
+
+        assertTrue(controller.prepare(sampleDetail(), sampleEpisode(), startPositionMs = 12_345L))
+
+        assertEquals(12_345L, engine.seekPositionMs)
+    }
+
     private fun sampleDetail() = VideoDetail(
         mediaKey = "video-1",
         title = "Sample video",
@@ -92,12 +102,17 @@ class VideoPlaybackControllerTest {
         override var isPlaying = false
         var setMediaCalls = 0
         var releaseCalls = 0
+        var seekPositionMs = 0L
 
         override fun setMediaUrl(mediaUrl: String) {
             setMediaCalls++
         }
 
         override fun prepare() = Unit
+
+        override fun seekTo(positionMs: Long) {
+            seekPositionMs = positionMs
+        }
 
         override fun play() {
             isPlaying = true

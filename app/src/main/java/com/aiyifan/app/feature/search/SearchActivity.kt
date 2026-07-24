@@ -15,6 +15,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.aiyifan.app.R
 import com.aiyifan.app.core.data.AppGraph
+import com.aiyifan.app.core.model.VideoSummary
+import com.aiyifan.app.core.ui.SearchPageState
 import com.aiyifan.app.core.ui.SearchResultAdapter
 import com.aiyifan.app.core.ui.SearchSuggestionAdapter
 import com.aiyifan.app.core.ui.applySystemBarsPadding
@@ -68,7 +70,7 @@ class SearchActivity : AppCompatActivity() {
         binding.backButton.setOnClickListener { finish() }
         binding.searchButton.setOnClickListener { executeSearch() }
         binding.searchStatus.setOnClickListener {
-            if (lastSearchKeyword.isNotBlank()) executeSearch()
+            if (binding.searchStatus.isClickable && lastSearchKeyword.isNotBlank()) executeSearch()
         }
         binding.searchEdit.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
@@ -131,24 +133,33 @@ class SearchActivity : AppCompatActivity() {
         lastSearchKeyword = keyword
         binding.initialScroll.isVisible = false
         binding.suggestionRecycler.isVisible = false
-        binding.resultsContainer.isVisible = true
-        binding.searchStatus.text = "正在搜索..."
-        resultAdapter.submitList(emptyList())
+        renderSearchState(SearchPageState.Loading)
         lifecycleScope.launch {
             runCatching { AppGraph.catalogRepository.searchVideos(keyword) }
                 .onSuccess { results ->
-                    resultAdapter.submitList(results)
                     saveKeyword(keyword)
-                    binding.searchStatus.text = if (results.isEmpty()) {
-                        "没有找到相关视频"
-                    } else {
-                        "共找到 ${results.size} 个视频"
-                    }
+                    renderSearchState(
+                        if (results.isEmpty()) SearchPageState.Empty else SearchPageState.Success,
+                        results,
+                    )
                 }
                 .onFailure {
-                    resultAdapter.submitList(emptyList())
-                    binding.searchStatus.text = "搜索失败，点击重试"
+                    renderSearchState(SearchPageState.Failure)
                 }
+        }
+    }
+
+    private fun renderSearchState(state: SearchPageState, results: List<VideoSummary> = emptyList()) {
+        binding.resultsContainer.isVisible = state.showResults
+        binding.searchStatus.isVisible = state.showMessage
+        binding.searchStatus.isClickable = state.showRetry
+        binding.resultRecycler.isVisible = state != SearchPageState.Loading
+        resultAdapter.submitList(results)
+        binding.searchStatus.text = when (state) {
+            SearchPageState.Loading -> "正在搜索..."
+            SearchPageState.Success -> ""
+            SearchPageState.Empty -> "没有找到相关视频"
+            SearchPageState.Failure -> "搜索失败，点击重试"
         }
     }
 

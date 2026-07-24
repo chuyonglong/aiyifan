@@ -10,6 +10,14 @@ import org.junit.Test
 class SearchResultPresentationTest {
 
     @Test
+    fun `success hides message while empty and failure show messages`() {
+        assertTrue(SearchPageState.Success.showResults)
+        assertFalse(SearchPageState.Success.showMessage)
+        assertTrue(SearchPageState.Empty.showMessage)
+        assertTrue(SearchPageState.Failure.showRetry)
+    }
+
+    @Test
     fun `presentation groups metadata and limits episode previews`() {
         val result = SearchResultPresentation.from(
             VideoSummary(
@@ -60,4 +68,5 @@ class SearchResultPresentationTest {
         assertEquals(listOf("1"), oneEpisodeResult.episodeLabels)
         assertTrue(oneEpisodeResult.showEpisodePreviews)
     }
+
 }

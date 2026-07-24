@@ -3,6 +3,17 @@ package com.aiyifan.app.core.ui
 import com.aiyifan.app.core.model.Episode
 import com.aiyifan.app.core.model.VideoSummary
 
+enum class SearchPageState(
+    val showResults: Boolean,
+    val showMessage: Boolean,
+    val showRetry: Boolean,
+) {
+    Loading(showResults = true, showMessage = true, showRetry = false),
+    Success(showResults = true, showMessage = false, showRetry = false),
+    Empty(showResults = true, showMessage = true, showRetry = false),
+    Failure(showResults = true, showMessage = true, showRetry = true),
+}
+
 data class SearchResultPresentation(
     val primaryMeta: String,
     val secondaryMeta: String,

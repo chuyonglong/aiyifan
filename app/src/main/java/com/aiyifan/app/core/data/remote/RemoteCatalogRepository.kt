@@ -343,6 +343,7 @@ class RemoteCatalogRepository(
                         coverUrl = item.optString("coverImgUrl").trim(),
                         videoType = item.optInt("videoType", item.optInt("type", 0)),
                         contentType = item.optString("contentType").trim().ifBlank { item.optString("typeName").trim().ifBlank { null } },
+                        mediaType = item.optString("mediaType").trim().ifBlank { null },
                         score = item.optString("score").trim().ifBlank { null },
                         playCount = item.optInt("playCount"),
                         updateStatus = item.optString("updateStatus").trim().ifBlank { null },
@@ -403,6 +404,7 @@ class RemoteCatalogRepository(
     private fun VideoSummary.matchesSearch(query: String): Boolean =
         title.contains(query, ignoreCase = true) ||
             contentType.orEmpty().contains(query, ignoreCase = true) ||
+            mediaType.orEmpty().contains(query, ignoreCase = true) ||
             area.orEmpty().contains(query, ignoreCase = true) ||
             year.orEmpty().contains(query, ignoreCase = true) ||
             actor.orEmpty().contains(query, ignoreCase = true) ||

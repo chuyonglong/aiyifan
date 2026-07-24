@@ -45,6 +45,7 @@ object TripDataHomeParser {
                         coverUrl = item.optString("coverImgUrl").trim(),
                         videoType = videoType,
                         contentType = item.optString("contentType").trim().ifBlank { null },
+                        mediaType = item.optString("mediaType").trim().ifBlank { null },
                         score = item.optString("score").trim().ifBlank { null },
                         playCount = item.optInt("playCount"),
                         updateStatus = item.optString("updateStatus").trim().ifBlank { null },

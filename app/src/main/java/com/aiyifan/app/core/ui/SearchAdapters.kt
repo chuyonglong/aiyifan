@@ -1,8 +1,14 @@
 package com.aiyifan.app.core.ui
 
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
+import com.aiyifan.app.R
 import com.aiyifan.app.core.model.SearchSuggestion
 import com.aiyifan.app.core.model.VideoSummary
 import com.aiyifan.app.databinding.ItemSearchResultBinding
@@ -61,12 +67,29 @@ class SearchResultAdapter(
         private val onClick: (VideoSummary) -> Unit,
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: VideoSummary) {
+            val presentation = SearchResultPresentation.from(item)
+
             binding.title.text = item.title
-            binding.meta.text = listOfNotNull(item.year, item.contentType, item.area, item.updateStatus).joinToString(" / ")
-            binding.credits.text = listOfNotNull(
-                item.director?.let { "导演：$it" },
-                item.actor?.let { "主演：$it" },
-            ).joinToString("\n")
+            binding.primaryMeta.setOptionalText(presentation.primaryMeta)
+            binding.secondaryMeta.setOptionalText(presentation.secondaryMeta)
+            binding.credits.setOptionalText(presentation.credits)
+            binding.episodePreviewRow.isVisible = presentation.showEpisodePreviews
+            binding.episodePreviewContainer.removeAllViews()
+            presentation.episodeLabels.forEach { label ->
+                binding.episodePreviewContainer.addView(
+                    TextView(binding.root.context).apply {
+                        text = label
+                        gravity = Gravity.CENTER
+                        setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                        textSize = 12f
+                        setBackgroundResource(R.drawable.bg_episode_preview)
+                        setOnClickListener { onClick(item) }
+                    },
+                    LinearLayout.LayoutParams(dpToPx(40), dpToPx(32)).apply {
+                        marginEnd = dpToPx(6)
+                    },
+                )
+            }
             if (item.coverUrl.isBlank()) {
                 binding.poster.setImageDrawable(null)
             } else {
@@ -76,5 +99,13 @@ class SearchResultAdapter(
             binding.playButton.setOnClickListener { onClick(item) }
             binding.viewAllButton.setOnClickListener { onClick(item) }
         }
+
+        private fun TextView.setOptionalText(value: String) {
+            isVisible = value.isNotBlank()
+            text = value
+        }
+
+        private fun dpToPx(value: Int): Int =
+            (value * binding.root.resources.displayMetrics.density).toInt()
     }
 }

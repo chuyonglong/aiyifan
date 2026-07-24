@@ -36,7 +36,7 @@ class SearchResultPresentationTest {
     }
 
     @Test
-    fun `presentation hides empty metadata and episode previews`() {
+    fun `presentation shows episode previews only when an episode is available`() {
         val result = SearchResultPresentation.from(
             VideoSummary(mediaKey = "demo", title = "示例", coverUrl = "", videoType = 1),
         )
@@ -46,5 +46,18 @@ class SearchResultPresentationTest {
         assertEquals("", result.credits)
         assertTrue(result.episodeLabels.isEmpty())
         assertFalse(result.showEpisodePreviews)
+
+        val oneEpisodeResult = SearchResultPresentation.from(
+            VideoSummary(
+                mediaKey = "demo",
+                title = "example",
+                coverUrl = "",
+                videoType = 1,
+                episodePreviews = listOf(Episode("ep-1", "1", 1, null)),
+            ),
+        )
+
+        assertEquals(listOf("1"), oneEpisodeResult.episodeLabels)
+        assertTrue(oneEpisodeResult.showEpisodePreviews)
     }
 }

@@ -7,31 +7,41 @@ sealed interface ProxyConnectionState {
     data object Failed : ProxyConnectionState
 }
 
+class ProxyConnectionAttempt internal constructor() {
+    override fun toString(): String = "ProxyConnectionAttempt"
+}
+
 class ProxyConnectionStateMachine {
     var state: ProxyConnectionState = ProxyConnectionState.Disconnected
         private set
+    private var currentAttempt: ProxyConnectionAttempt? = null
 
     fun connect(node: ProxyNode): ProxyConnectionState {
         if (state.isForNode(node)) return state
+        currentAttempt = ProxyConnectionAttempt()
         state = ProxyConnectionState.Connecting(node)
         return state
     }
 
-    fun completeConnection(callbackNodeId: String): ProxyConnectionState {
+    fun activeAttempt(): ProxyConnectionAttempt? =
+        currentAttempt?.takeIf { state is ProxyConnectionState.Connecting }
+
+    fun completeConnection(callbackAttempt: ProxyConnectionAttempt): ProxyConnectionState {
         val connecting = state as? ProxyConnectionState.Connecting ?: return state
-        if (connecting.node.id != callbackNodeId) return state
+        if (currentAttempt !== callbackAttempt) return state
         state = ProxyConnectionState.Connected(connecting.node)
         return state
     }
 
-    fun failConnection(callbackNodeId: String): ProxyConnectionState {
+    fun failConnection(callbackAttempt: ProxyConnectionAttempt): ProxyConnectionState {
         val connecting = state as? ProxyConnectionState.Connecting ?: return state
-        if (connecting.node.id != callbackNodeId) return state
+        if (currentAttempt !== callbackAttempt) return state
         state = ProxyConnectionState.Failed
         return state
     }
 
     fun disconnect(): ProxyConnectionState {
+        currentAttempt = null
         if (state !is ProxyConnectionState.Disconnected) {
             state = ProxyConnectionState.Disconnected
         }

@@ -2,6 +2,7 @@ package com.aiyifan.app.feature.proxy.domain
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
@@ -19,12 +20,14 @@ class ProxyConnectionStateMachineTest {
         val machine = ProxyConnectionStateMachine()
 
         val first = machine.connect(node)
+        val firstAttempt = requireNotNull(machine.activeAttempt())
         val second = machine.connect(node)
 
         assertEquals(ProxyConnectionState.Connecting(node), first)
         assertSame(first, second)
+        assertSame(firstAttempt, machine.activeAttempt())
 
-        val connected = machine.completeConnection(node.id)
+        val connected = machine.completeConnection(firstAttempt)
         assertEquals(ProxyConnectionState.Connected(node), connected)
         assertSame(connected, machine.connect(node))
     }
@@ -33,21 +36,23 @@ class ProxyConnectionStateMachineTest {
     fun `disconnect is idempotent from every state`() {
         val machine = ProxyConnectionStateMachine()
         machine.connect(node)
+        val attempt = requireNotNull(machine.activeAttempt())
 
         val first = machine.disconnect()
         val second = machine.disconnect()
 
         assertEquals(ProxyConnectionState.Disconnected, first)
         assertSame(first, second)
-        assertEquals(ProxyConnectionState.Disconnected, machine.completeConnection(node.id))
+        assertEquals(ProxyConnectionState.Disconnected, machine.completeConnection(attempt))
     }
 
     @Test
     fun `connection failure can be retried and does not retain node credentials`() {
         val machine = ProxyConnectionStateMachine()
         machine.connect(node)
+        val attempt = requireNotNull(machine.activeAttempt())
 
-        val failed = machine.failConnection(node.id)
+        val failed = machine.failConnection(attempt)
 
         assertEquals(ProxyConnectionState.Failed, failed)
         assertEquals(ProxyConnectionState.Connecting(node), machine.connect(node))
@@ -80,10 +85,27 @@ class ProxyConnectionStateMachineTest {
         )
         val machine = ProxyConnectionStateMachine()
         machine.connect(firstNode)
+        val firstAttempt = requireNotNull(machine.activeAttempt())
         machine.connect(secondNode)
+        val secondAttempt = requireNotNull(machine.activeAttempt())
 
-        assertEquals(ProxyConnectionState.Connecting(secondNode), machine.completeConnection(firstNode.id))
-        assertEquals(ProxyConnectionState.Connecting(secondNode), machine.failConnection(firstNode.id))
-        assertEquals(ProxyConnectionState.Connected(secondNode), machine.completeConnection(secondNode.id))
+        assertEquals(ProxyConnectionState.Connecting(secondNode), machine.completeConnection(firstAttempt))
+        assertEquals(ProxyConnectionState.Connecting(secondNode), machine.failConnection(firstAttempt))
+        assertEquals(ProxyConnectionState.Connected(secondNode), machine.completeConnection(secondAttempt))
+    }
+
+    @Test
+    fun `stale callbacks cannot change a reconnect attempt for the same node`() {
+        val machine = ProxyConnectionStateMachine()
+        machine.connect(node)
+        val firstAttempt = requireNotNull(machine.activeAttempt())
+        machine.disconnect()
+        machine.connect(node)
+        val secondAttempt = requireNotNull(machine.activeAttempt())
+
+        assertNotEquals(firstAttempt, secondAttempt)
+        assertEquals(ProxyConnectionState.Connecting(node), machine.completeConnection(firstAttempt))
+        assertEquals(ProxyConnectionState.Connecting(node), machine.failConnection(firstAttempt))
+        assertEquals(ProxyConnectionState.Connected(node), machine.completeConnection(secondAttempt))
     }
 }

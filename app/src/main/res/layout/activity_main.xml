@@ -12,13 +12,20 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNav"
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/bottomTabs"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="@color/surface"
-        app:itemIconTint="@color/accent"
-        app:itemTextColor="@color/text_primary"
-        app:labelVisibilityMode="labeled"
-        app:menu="@menu/main_bottom_nav" />
+        app:tabGravity="fill"
+        app:tabIndicatorColor="@color/accent"
+        app:tabIndicatorHeight="2dp"
+        app:tabMode="fixed"
+        app:tabSelectedTextColor="@color/accent"
+        app:tabTextColor="@color/text_secondary">
+
+        <com.google.android.material.tabs.TabItem android:text="@string/tab_home" />
+        <com.google.android.material.tabs.TabItem android:text="@string/tab_hot" />
+        <com.google.android.material.tabs.TabItem android:text="@string/tab_mine" />
+    </com.google.android.material.tabs.TabLayout>
 </LinearLayout>

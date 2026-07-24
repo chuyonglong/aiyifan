@@ -194,7 +194,7 @@ class RemoteCatalogRepository(
         val episodes = parseEpisodes(detailInfo.optJSONArray("episodes"))
         val related = cachedSections
             ?.flatMap { it.videos }
-            ?.filterNot { it.mediaKey == detailInfo.optString("mediaKey").trim() }
+            ?.filterNot { it.mediaKey == detailInfo.optionalRemoteText("mediaKey") }
             ?.distinctBy { it.mediaKey }
             ?.take(12)
             .orEmpty()
@@ -206,7 +206,7 @@ class RemoteCatalogRepository(
                     resolution = resolution,
                     description = "${resolution}P",
                     mediaUrl = "",
-                    isDefault = resolution == detailInfo.optString("resolution").trim(),
+                    isDefault = resolution == detailInfo.optionalRemoteText("resolution"),
                 )
             }
         val languages = buildList {
@@ -216,27 +216,27 @@ class RemoteCatalogRepository(
                 ?: JSONArray()
             for (index in 0 until languageList.length()) {
                 val item = languageList.optJSONObject(index) ?: continue
-                val name = item.optString("name").trim()
-                val mediaKey = item.optString("mediaKey").trim()
-                if (name.isNotBlank() && mediaKey.isNotBlank()) {
+                val name = item.optionalRemoteText("name")
+                val mediaKey = item.optionalRemoteText("mediaKey")
+                if (name != null && mediaKey != null) {
                     add(PlaybackLanguage(mediaKey = mediaKey, name = name))
                 }
             }
         }
         return VideoDetail(
-            mediaKey = detailInfo.optString("mediaKey").trim(),
-            title = detailInfo.optString("title").trim(),
-            coverUrl = detailInfo.optString("coverImgUrl").trim(),
+            mediaKey = detailInfo.optionalRemoteText("mediaKey").orEmpty(),
+            title = detailInfo.optionalRemoteText("title").orEmpty(),
+            coverUrl = detailInfo.optionalRemoteText("coverImgUrl").orEmpty(),
             videoType = detailInfo.optInt("videoType"),
-            typeName = detailInfo.optString("typeName").trim().ifBlank { null },
-            director = detailInfo.optString("director").trim().ifBlank { null },
-            actor = detailInfo.optString("actor").trim().ifBlank { null },
-            introduce = detailInfo.optString("introduce").trim().ifBlank { null },
+            typeName = detailInfo.optionalRemoteText("typeName"),
+            director = detailInfo.optionalRemoteText("director"),
+            actor = detailInfo.optionalRemoteText("actor"),
+            introduce = detailInfo.optionalRemoteText("introduce"),
             playCount = detailInfo.optInt("playCount"),
             comments = detailInfo.optInt("comments"),
             shareCount = detailInfo.optInt("shareCount"),
-            publishTime = detailInfo.optString("publishTime").trim().ifBlank { null },
-            updateMsg = detailInfo.optString("updateStatus").trim().ifBlank { null },
+            publishTime = detailInfo.optionalRemoteText("publishTime"),
+            updateMsg = detailInfo.optionalRemoteText("updateStatus"),
             commentEnabled = detailInfo.optInt("commentStatus", 0) == 0,
             episodes = episodes,
             qualities = qualities,
@@ -250,16 +250,16 @@ class RemoteCatalogRepository(
             if (items == null) return@buildList
             for (index in 0 until items.length()) {
                 val item = items.optJSONObject(index) ?: continue
-                val episodeKey = item.optString("episodeKey").trim()
+                val episodeKey = item.optionalRemoteText("episodeKey").orEmpty()
                 if (episodeKey.isBlank()) continue
                 add(
                     Episode(
                         episodeKey = episodeKey,
-                        episodeTitle = item.optString("episodeTitle").trim().ifBlank { "${index + 1}" },
+                        episodeTitle = item.optionalRemoteText("episodeTitle") ?: "${index + 1}",
                         uniqueId = item.optInt("episodeId"),
-                        mediaUrl = item.optString("mediaUrl").trim().ifBlank { null },
-                        resolution = item.optString("resolution").trim().ifBlank { null },
-                        lang = item.optString("lang").trim().ifBlank { null },
+                        mediaUrl = item.optionalRemoteText("mediaUrl"),
+                        resolution = item.optionalRemoteText("resolution"),
+                        lang = item.optionalRemoteText("lang"),
                         duration = null,
                     ),
                 )
@@ -274,8 +274,7 @@ class RemoteCatalogRepository(
         var best: JSONObject? = null
         for (index in 0 until items.length()) {
             val item = items.optJSONObject(index) ?: continue
-            val mediaUrl = item.optString("mediaUrl").trim()
-            if (mediaUrl.isBlank()) continue
+            if (item.optionalRemoteText("mediaUrl") == null) continue
             if (item.optBoolean("isDefault")) {
                 best = item
                 break
@@ -286,11 +285,11 @@ class RemoteCatalogRepository(
         }
         val chosen = best ?: return fallbackEpisode
         return fallbackEpisode.copy(
-            episodeKey = chosen.optString("episodeKey").trim().ifBlank { fallbackEpisode.episodeKey },
+            episodeKey = chosen.optionalRemoteText("episodeKey") ?: fallbackEpisode.episodeKey,
             uniqueId = chosen.optInt("episodeId", fallbackEpisode.uniqueId),
-            mediaUrl = chosen.optString("mediaUrl").trim().ifBlank { fallbackEpisode.mediaUrl },
-            resolution = chosen.optString("resolution").trim().ifBlank { fallbackEpisode.resolution },
-            lang = chosen.optString("lang").trim().ifBlank { fallbackEpisode.lang },
+            mediaUrl = chosen.optionalRemoteText("mediaUrl") ?: fallbackEpisode.mediaUrl,
+            resolution = chosen.optionalRemoteText("resolution") ?: fallbackEpisode.resolution,
+            lang = chosen.optionalRemoteText("lang") ?: fallbackEpisode.lang,
         )
     }
 
@@ -329,25 +328,27 @@ class RemoteCatalogRepository(
         return buildList {
             for (index in 0 until items.length()) {
                 val item = items.optJSONObject(index) ?: continue
-                val mediaKey = item.optString("mediaKey").trim().ifBlank { item.optString("videoKey").trim() }
+                val mediaKey = item.optionalRemoteText("mediaKey").orEmpty().ifBlank {
+                    item.optionalRemoteText("videoKey").orEmpty()
+                }
                 if (mediaKey.isBlank()) continue
-                val publishTime = item.optString("publishTime").trim()
+                val publishTime = item.optionalRemoteText("publishTime").orEmpty()
                 add(
                     VideoSummary(
                         mediaKey = mediaKey,
-                        episodeKey = item.optString("episodeKey").trim().ifBlank { null },
-                        title = item.optString("title").trim(),
-                        coverUrl = item.optString("coverImgUrl").trim(),
+                        episodeKey = item.optionalRemoteText("episodeKey"),
+                        title = item.optionalRemoteText("title").orEmpty(),
+                        coverUrl = item.optionalRemoteText("coverImgUrl").orEmpty(),
                         videoType = item.optInt("videoType", item.optInt("type", 0)),
-                        contentType = item.optString("contentType").trim().ifBlank { item.optString("typeName").trim().ifBlank { null } },
-                        mediaType = item.optString("mediaType").trim().ifBlank { null },
-                        score = item.optString("score").trim().ifBlank { null },
+                        contentType = item.optionalRemoteText("contentType") ?: item.optionalRemoteText("typeName"),
+                        mediaType = item.optionalRemoteText("mediaType"),
+                        score = item.optionalRemoteText("score"),
                         playCount = item.optInt("playCount"),
-                        updateStatus = item.optString("updateStatus").trim().ifBlank { null },
+                        updateStatus = item.optionalRemoteText("updateStatus"),
                         year = publishTime.takeIf { it.length >= 4 }?.take(4),
-                        area = item.optString("regional").trim().ifBlank { null },
-                        actor = item.optString("actor").trim().ifBlank { null },
-                        director = item.optString("director").trim().ifBlank { null },
+                        area = item.optionalRemoteText("regional"),
+                        actor = item.optionalRemoteText("actor"),
+                        director = item.optionalRemoteText("director"),
                         episodePreviews = parseEpisodePreviews(item.optJSONArray("episodes")),
                     ),
                 )
@@ -357,6 +358,9 @@ class RemoteCatalogRepository(
 
     private fun parseEpisodePreviews(items: JSONArray?): List<Episode> =
         parseEpisodes(items).take(6)
+
+    private fun JSONObject.optionalRemoteText(key: String): String? =
+        RemoteTextNormalizer.optional(optString(key))
 
     private suspend fun localSuggestions(query: String): List<SearchSuggestion> =
         try {

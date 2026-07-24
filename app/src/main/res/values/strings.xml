@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">爱壹帆</string>
-    <string name="video_poster">Video poster</string>
+    <string name="video_poster">视频海报</string>
+    <string name="tab_home">首页</string>
+    <string name="tab_hot">热门</string>
+    <string name="tab_mine">我的</string>
+    <string name="video_not_found">未找到视频</string>
+    <string name="video_loading">加载中…</string>
+    <string name="video_detail_load_failed">视频详情加载失败</string>
+    <string name="video_stream_loading">正在加载播放源</string>
+    <string name="video_stream_load_failed">播放源加载失败</string>
+    <string name="video_no_playable_stream">暂无可播放视频</string>
+    <string name="video_play_count">播放 %1$d</string>
+    <string name="video_director">导演：%1$s</string>
+    <string name="video_cast">主演：%1$s</string>
+    <string name="video_favorite">收藏</string>
+    <string name="video_favorited">已收藏</string>
+    <string name="video_favorite_added">已加入收藏</string>
+    <string name="video_favorite_removed">已取消收藏</string>
+    <string name="video_share_chooser">分享</string>
 </resources>

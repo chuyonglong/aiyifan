@@ -2,6 +2,7 @@ package com.aiyifan.app.core.data.remote
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RemoteCatalogRepositorySearchTest {
@@ -123,6 +124,42 @@ class RemoteCatalogRepositorySearchTest {
     }
 
     @Test
+    fun `search converts remote null text fields to missing metadata`() = runBlocking {
+        val repository = repository(
+            searchResponse =
+                """
+                {
+                  "ret": 200,
+                  "data": [
+                    {
+                      "mediaKey": "remote-null-metadata",
+                      "title": "字段清理测试",
+                      "coverImgUrl": "null",
+                      "videoType": 1,
+                      "contentType": " null ",
+                      "mediaType": "电影",
+                      "regional": "NULL",
+                      "actor": "null",
+                      "director": "  null  ",
+                      "updateStatus": "null"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+        )
+
+        val result = repository.searchVideos("字段")
+
+        assertEquals("电影", result.single().mediaType)
+        assertEquals("", result.single().coverUrl)
+        assertNull(result.single().contentType)
+        assertNull(result.single().area)
+        assertNull(result.single().actor)
+        assertNull(result.single().director)
+        assertNull(result.single().updateStatus)
+    }
+
+    @Test
     fun `search falls back to mock catalog when home catalog is unavailable`() = runBlocking {
         val repository = repository(searchResponse = """{"ret":202,"data":null}""")
 
@@ -139,6 +176,7 @@ class RemoteCatalogRepositorySearchTest {
             put(CONFIG_URL, HttpResponse(200, """{"api":"$BASE_URL"}"""))
             put("电影", HttpResponse(200, searchResponse))
             put("远程", HttpResponse(200, searchResponse))
+            put("字段", HttpResponse(200, searchResponse))
             put("迷城", HttpResponse(200, searchResponse))
             homeResponse?.let { put(HOME_URL, HttpResponse(200, it)) }
         }

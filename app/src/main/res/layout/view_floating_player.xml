@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_floating_player"
+    android:clipToOutline="true">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/floatingPlayerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:show_buffering="when_playing"
+        app:use_controller="false" />
+
+    <View
+        android:id="@+id/floatingDragHandle"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:layout_gravity="top" />
+
+    <ImageButton
+        android:id="@+id/floatingCloseButton"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:background="@drawable/bg_floating_control"
+        android:contentDescription="关闭悬浮播放器"
+        android:padding="6dp"
+        android:src="@drawable/ic_close" />
+
+    <ImageButton
+        android:id="@+id/floatingPlayPauseButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_floating_control"
+        android:contentDescription="暂停播放"
+        android:padding="8dp"
+        android:src="@drawable/ic_pause" />
+
+    <ImageButton
+        android:id="@+id/floatingResizeHandle"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="4dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="调整悬浮播放器大小"
+        android:padding="2dp"
+        android:src="@drawable/ic_resize" />
+</FrameLayout>

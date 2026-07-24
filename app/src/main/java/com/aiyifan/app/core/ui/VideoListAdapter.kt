@@ -7,6 +7,7 @@ import com.aiyifan.app.core.model.FavoriteVideo
 import com.aiyifan.app.core.model.VideoSummary
 import com.aiyifan.app.core.model.WatchHistory
 import com.aiyifan.app.databinding.ItemVideoCardBinding
+import com.bumptech.glide.Glide
 
 class VideoListAdapter(
     private val onClick: (VideoSummary) -> Unit,
@@ -35,7 +36,14 @@ class VideoListAdapter(
         private val onClick: (VideoSummary) -> Unit,
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(video: VideoSummary) {
-            binding.poster.text = video.contentType ?: "VIDEO"
+            if (video.coverUrl.isBlank()) {
+                Glide.with(binding.poster).clear(binding.poster)
+            } else {
+                Glide.with(binding.poster)
+                    .load(video.coverUrl)
+                    .centerCrop()
+                    .into(binding.poster)
+            }
             binding.title.text = video.title
             binding.meta.text = listOfNotNull(video.year, video.area, video.updateStatus).joinToString(" / ")
             binding.score.text = "评分 ${video.score ?: "-"}  播放 ${video.playCount}"

@@ -19,6 +19,7 @@ import com.aiyifan.app.databinding.FragmentHomeBinding
 import com.aiyifan.app.feature.history.HistoryActivity
 import com.aiyifan.app.feature.search.SearchActivity
 import com.aiyifan.app.feature.video.VideoPlayerActivity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
@@ -41,12 +42,30 @@ class HomeFragment : Fragment() {
         binding.videoRecycler.adapter = adapter
         binding.searchBox.setOnClickListener { startActivity(Intent(requireContext(), SearchActivity::class.java)) }
         binding.historyButton.setOnClickListener { startActivity(Intent(requireContext(), HistoryActivity::class.java)) }
+        binding.homeRefresh.setOnRefreshListener { loadHome(refresh = true) }
+        loadHome()
+    }
+
+    private fun loadHome(refresh: Boolean = false) {
         viewLifecycleOwner.lifecycleScope.launch {
-            runCatching { repository.getCategories() }
-                .onSuccess { categories -> renderCategories(categories) }
-                .onFailure {
-                    Toast.makeText(requireContext(), "首页数据加载失败", Toast.LENGTH_SHORT).show()
+            try {
+                if (refresh) {
+                    repository.refreshHome()
                 }
+                val categories = repository.getCategories()
+                val category = categories.firstOrNull { it.id == selectedCategory?.id } ?: categories.first()
+                renderCategories(categories)
+                selectedCategory = category
+                adapter.submitList(repository.getHomeVideos(category.id))
+            } catch (exception: Throwable) {
+                if (exception is CancellationException) throw exception
+                Toast.makeText(requireContext(), "首页刷新失败", Toast.LENGTH_SHORT).show()
+                if (!refresh) {
+                    adapter.submitList(emptyList())
+                }
+            } finally {
+                _binding?.homeRefresh?.isRefreshing = false
+            }
         }
     }
 
@@ -68,7 +87,6 @@ class HomeFragment : Fragment() {
             }
             binding.categoryContainer.addView(tab)
         }
-        selectCategory(categories.first())
     }
 
     private fun selectCategory(category: Category) {

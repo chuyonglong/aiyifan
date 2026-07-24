@@ -14,6 +14,8 @@ interface CatalogRepository {
 
     suspend fun getHomeVideos(categoryId: String): List<VideoSummary>
 
+    suspend fun refreshHome()
+
     suspend fun getHotVideos(): List<VideoSummary>
 
     suspend fun searchVideos(keyword: String): List<VideoSummary>

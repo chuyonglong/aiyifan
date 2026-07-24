@@ -24,6 +24,7 @@ data class VideoSummary(
     val area: String? = null,
     val actor: String? = null,
     val director: String? = null,
+    val episodePreviews: List<Episode> = emptyList(),
 )
 
 data class SearchSuggestion(

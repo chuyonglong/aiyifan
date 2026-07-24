@@ -348,11 +348,15 @@ class RemoteCatalogRepository(
                         area = item.optString("regional").trim().ifBlank { null },
                         actor = item.optString("actor").trim().ifBlank { null },
                         director = item.optString("director").trim().ifBlank { null },
+                        episodePreviews = parseEpisodePreviews(item.optJSONArray("episodes")),
                     ),
                 )
             }
         }
     }
+
+    private fun parseEpisodePreviews(items: JSONArray?): List<Episode> =
+        parseEpisodes(items).take(6)
 
     private suspend fun localSuggestions(query: String): List<SearchSuggestion> =
         try {

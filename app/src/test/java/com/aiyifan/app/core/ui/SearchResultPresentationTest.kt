@@ -44,6 +44,25 @@ class SearchResultPresentationTest {
     }
 
     @Test
+    fun `presentation uses content type as the primary type fallback`() {
+        val result = SearchResultPresentation.from(
+            VideoSummary(
+                mediaKey = "fallback",
+                title = "示例",
+                coverUrl = "",
+                videoType = 1,
+                year = "2026",
+                contentType = "电视剧",
+                area = "中国大陆",
+                updateStatus = "更新至12集",
+            ),
+        )
+
+        assertEquals("2026 / 电视剧", result.primaryMeta)
+        assertEquals("中国大陆 / 更新至12集", result.secondaryMeta)
+    }
+
+    @Test
     fun `presentation shows episode previews only when an episode is available`() {
         val result = SearchResultPresentation.from(
             VideoSummary(mediaKey = "demo", title = "示例", coverUrl = "", videoType = 1),

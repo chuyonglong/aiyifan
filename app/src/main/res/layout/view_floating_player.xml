@@ -13,12 +13,6 @@
         app:show_buffering="when_playing"
         app:use_controller="false" />
 
-    <View
-        android:id="@+id/floatingDragHandle"
-        android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:layout_gravity="top" />
-
     <ImageButton
         android:id="@+id/floatingCloseButton"
         android:layout_width="36dp"

@@ -55,6 +55,12 @@ class RemoteCatalogRepository(
             fallback.getHomeVideos(categoryId)
         }
 
+    override suspend fun refreshHome() {
+        cacheLock.withLock {
+            cachedSections = fetchHomeSections()
+        }
+    }
+
     override suspend fun getHotVideos(): List<VideoSummary> =
         try {
             ensureSections()
@@ -163,14 +169,20 @@ class RemoteCatalogRepository(
         cachedSections?.let { return it }
         return cacheLock.withLock {
             cachedSections?.let { return@withLock it }
-            val baseUrl = configResolver.resolveBaseUrl()
-            val response = fetcher.get("${baseUrl}api/List/Index")
-            if (response.code !in 200..299) {
-                throw IllegalStateException("Home request failed: ${response.code}")
-            }
-            TripDataHomeParser.parse(response.body).also { parsed ->
+            fetchHomeSections().also { parsed ->
                 cachedSections = parsed
             }
+        }
+    }
+
+    private suspend fun fetchHomeSections(): List<TripDataHomeSection> {
+        val baseUrl = configResolver.resolveBaseUrl()
+        val response = fetcher.get("${baseUrl}api/List/Index")
+        if (response.code !in 200..299) {
+            throw IllegalStateException("Home request failed: ${response.code}")
+        }
+        return TripDataHomeParser.parse(response.body).also { sections ->
+            check(sections.isNotEmpty()) { "Home response contains no sections" }
         }
     }
 

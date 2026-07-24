@@ -97,6 +97,8 @@ class FakeCatalogRepository(
             else -> summaries.filter { it.contentType == categories.firstOrNull { category -> category.id == categoryId }?.name }
         }
 
+    override suspend fun refreshHome() = Unit
+
     override suspend fun getHotVideos(): List<VideoSummary> =
         summaries.sortedByDescending { it.playCount }
 

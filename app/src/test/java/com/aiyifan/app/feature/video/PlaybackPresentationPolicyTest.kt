@@ -40,6 +40,23 @@ class PlaybackPresentationPolicyTest {
     }
 
     @Test
+    fun `overlay is fallback when picture in picture is disabled`() {
+        assertEquals(
+            PlaybackDestination.OVERLAY,
+            PlaybackPresentationPolicy.destinationWhenLeaving(
+                PlaybackCapabilities(
+                    hasPlayableMedia = true,
+                    isPrepared = true,
+                    isPlaying = true,
+                    supportsPictureInPicture = true,
+                    pictureInPictureEnabled = false,
+                    hasOverlayPermission = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `paused video does not enter picture in picture`() {
         assertEquals(
             PlaybackDestination.NONE,

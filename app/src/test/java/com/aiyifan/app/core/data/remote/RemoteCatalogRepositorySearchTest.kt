@@ -3,9 +3,54 @@ package com.aiyifan.app.core.data.remote
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.net.URLEncoder
 
 class RemoteCatalogRepositorySearchTest {
+
+    @Test
+    fun `search uses original app endpoint and parses its nested video list`() = runBlocking {
+        val fetcher = object : HttpFetcher {
+            override suspend fun get(url: String): HttpResponse = when (url) {
+                CONFIG_URL -> HttpResponse(200, """{"api":"$BASE_URL"}""")
+                else -> HttpResponse(404, "")
+            }
+
+            override suspend fun postForm(url: String, params: Map<String, String>): HttpResponse {
+                assertEquals("$BASE_URL/api/List/GetTitleGetData", url)
+                assertEquals(mapOf("SearchCriteria" to "真人快打2"), params)
+                return HttpResponse(
+                    200,
+                    """
+                        {
+                          "ret": 200,
+                          "data": {
+                            "list": [
+                              {
+                                "mediaKey": "mortal-kombat-2",
+                                "episodeKey": "episode-1",
+                                "title": "真人快打2",
+                                "coverImgUrl": "https://example.com/mk2.jpg",
+                                "videoType": 0,
+                                "mediaType": "电影",
+                                "contentType": "动作",
+                                "postTime": "2026-06-08T12:17:00Z"
+                              }
+                            ]
+                          }
+                        }
+                    """.trimIndent(),
+                )
+            }
+        }
+        val repository = RemoteCatalogRepository(
+            configResolver = RemoteConfigResolver(fetcher),
+            fetcher = fetcher,
+        )
+
+        val results = repository.searchVideos("真人快打2")
+
+        assertEquals(listOf("mortal-kombat-2"), results.map { it.mediaKey })
+        assertEquals("电影", results.single().mediaType)
+    }
 
     @Test
     fun `search falls back to home catalog when remote search returns business error`() = runBlocking {
@@ -79,9 +124,9 @@ class RemoteCatalogRepositorySearchTest {
     ): RemoteCatalogRepository {
         val responses = buildMap {
             put(CONFIG_URL, HttpResponse(200, """{"api":"$BASE_URL"}"""))
-            put(searchUrl("电影"), HttpResponse(200, searchResponse))
-            put(searchUrl("远程"), HttpResponse(200, searchResponse))
-            put(searchUrl("迷城"), HttpResponse(200, searchResponse))
+            put("电影", HttpResponse(200, searchResponse))
+            put("远程", HttpResponse(200, searchResponse))
+            put("迷城", HttpResponse(200, searchResponse))
             homeResponse?.let { put(HOME_URL, HttpResponse(200, it)) }
         }
         val fetcher = FakeHttpFetcher(responses)
@@ -91,14 +136,18 @@ class RemoteCatalogRepositorySearchTest {
         )
     }
 
-    private fun searchUrl(keyword: String): String =
-        "$BASE_URL/api/Search/GetSearch?keyword=${URLEncoder.encode(keyword, Charsets.UTF_8.name())}&region=cn"
-
     private class FakeHttpFetcher(
         private val responses: Map<String, HttpResponse>,
     ) : HttpFetcher {
         override suspend fun get(url: String): HttpResponse =
             responses[url] ?: HttpResponse(404, "")
+
+        override suspend fun postForm(url: String, params: Map<String, String>): HttpResponse =
+            if (url == "$BASE_URL/api/List/GetTitleGetData") {
+                responses[params["SearchCriteria"]] ?: HttpResponse(404, "")
+            } else {
+                HttpResponse(404, "")
+            }
     }
 
     private companion object {

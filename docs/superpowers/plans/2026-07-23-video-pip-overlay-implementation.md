@@ -4,7 +4,7 @@
 
 **目标：**为视频播放器提供横竖屏全屏切换、系统画中画的播放/暂停与缩放，以及可拖动、可缩放的应用内悬浮窗。
 
-**架构：**纯 Kotlin 展示策略决定容器转换；唯一的 VideoPlaybackController 持有 ExoPlayer 与 MediaSession。Activity 承载普通页面、全屏与系统 PiP；前台服务通过 WindowManager 承载应用内悬浮窗。
+**架构：**纯 Kotlin 展示策略决定容器转换；唯一的 VideoPlaybackController 持有 ExoPlayer 与 MediaSession。Activity 承载普通页面、全屏、系统 PiP 和无权限时的应用内迷你播放器；前台服务通过 WindowManager 承载已授权的跨应用悬浮窗。
 
 **技术栈：**Kotlin、AndroidX、Media3 ExoPlayer/Session、Android PiP、前台媒体服务、WindowManager、JUnit 4。
 

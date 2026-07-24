@@ -5,7 +5,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
 
 private const val DEFAULT_REGION = "cn"
@@ -17,6 +19,9 @@ data class HttpResponse(
 
 interface HttpFetcher {
     suspend fun get(url: String): HttpResponse
+
+    suspend fun postForm(url: String, params: Map<String, String>): HttpResponse =
+        throw UnsupportedOperationException("Form POST is not supported")
 }
 
 class UrlConnectionHttpFetcher : HttpFetcher {
@@ -46,6 +51,44 @@ class UrlConnectionHttpFetcher : HttpFetcher {
                 connection.disconnect()
             }
         }
+
+    override suspend fun postForm(url: String, params: Map<String, String>): HttpResponse =
+        withContext(Dispatchers.IO) {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 10_000
+                readTimeout = 10_000
+                instanceFollowRedirects = true
+                doOutput = true
+                setRequestProperty("User-Agent", "Aiyifan/1.0")
+                setRequestProperty("Accept", "application/json,text/plain,*/*")
+                setRequestProperty("Accept-Language", "zh-CN")
+                setRequestProperty("X-Region", DEFAULT_REGION)
+                setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+            }
+            try {
+                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
+                    writer.write(
+                        params.entries.joinToString("&") { (key, value) ->
+                            "${encode(key)}=${encode(value)}"
+                        },
+                    )
+                }
+                val stream = if (connection.responseCode in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+                val body = stream?.use { input ->
+                    BufferedReader(InputStreamReader(input)).readText()
+                }.orEmpty()
+                HttpResponse(connection.responseCode, body)
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+    private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 }
 
 class RemoteConfigResolver(

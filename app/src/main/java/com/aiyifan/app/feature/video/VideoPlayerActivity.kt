@@ -55,7 +55,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         binding = ActivityVideoPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.pageContent.applySystemBarsPadding(left = true, right = true, bottom = true)
-        binding.playerContainer.applySystemBarsPadding(top = true, growHeight = true)
+        binding.playerTopBar.applySystemBarsPadding(top = true, growHeight = true)
 
         binding.backButton.setOnClickListener { handleBack() }
         binding.fullScreenButton.setOnClickListener { setFullScreen(!isFullScreen) }
@@ -234,6 +234,7 @@ class VideoPlayerActivity : AppCompatActivity() {
             systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             if (enabled) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
         }
+        binding.playerTopBar.isVisible = !enabled
         binding.contentScroll.isVisible = !enabled && !isInAppMiniPlayerVisible
         (binding.playerContainer.layoutParams as LinearLayout.LayoutParams).apply {
             height = if (enabled) 0 else dpToPx(NORMAL_PLAYER_HEIGHT_DP)
@@ -268,6 +269,7 @@ class VideoPlayerActivity : AppCompatActivity() {
         binding.fullScreenButton.isVisible = !isInPictureInPictureMode
         binding.floatingWindowButton.isVisible = !isInPictureInPictureMode
         binding.backButton.isVisible = !isInPictureInPictureMode
+        binding.playerTopBar.isVisible = !isInPictureInPictureMode && !isFullScreen
     }
 
     private fun enterSystemPictureInPicture(): Boolean {

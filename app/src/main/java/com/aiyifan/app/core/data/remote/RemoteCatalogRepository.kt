@@ -296,12 +296,9 @@ class RemoteCatalogRepository(
 
     private suspend fun searchRemoteVideos(query: String): List<VideoSummary> {
         val baseUrl = configResolver.resolveBaseUrl()
-        val response = fetcher.get(
-            buildUrl(
-                baseUrl,
-                "api/Search/GetSearch",
-                linkedMapOf("keyword" to query, "region" to DEFAULT_REGION),
-            ),
+        val response = fetcher.postForm(
+            "${baseUrl}api/List/GetTitleGetData",
+            mapOf("SearchCriteria" to query),
         )
         if (response.code !in 200..299) throw IllegalStateException("Search failed: ${response.code}")
         val payload = JSONObject(response.body)

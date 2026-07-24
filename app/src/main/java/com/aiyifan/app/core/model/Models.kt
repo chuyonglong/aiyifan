@@ -15,6 +15,7 @@ data class VideoSummary(
     val coverUrl: String,
     val videoType: Int,
     val contentType: String? = null,
+    val mediaType: String? = null,
     val score: String? = null,
     val playCount: Int = 0,
     val updateStatus: String? = null,

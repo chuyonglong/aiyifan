@@ -79,5 +79,13 @@
             android:background="@drawable/bg_surface"
             android:text="我的收藏"
             android:textColor="@color/text_primary" />
+        <Button
+            android:id="@+id/proxySettingsButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_surface"
+            android:text="&#x7F51;&#x7EDC;&#x4EE3;&#x7406;"
+            android:textColor="@color/text_primary" />
     </LinearLayout>
 </ScrollView>

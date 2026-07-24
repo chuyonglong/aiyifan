@@ -10,6 +10,7 @@ import com.aiyifan.app.databinding.FragmentMineBinding
 import com.aiyifan.app.feature.auth.LoginActivity
 import com.aiyifan.app.feature.collection.CollectionActivity
 import com.aiyifan.app.feature.history.HistoryActivity
+import com.aiyifan.app.feature.proxy.ProxySettingsActivity
 
 class MineFragment : Fragment() {
     private var _binding: FragmentMineBinding? = null
@@ -24,6 +25,9 @@ class MineFragment : Fragment() {
         binding.loginButton.setOnClickListener { startActivity(Intent(requireContext(), LoginActivity::class.java)) }
         binding.historyButton.setOnClickListener { startActivity(Intent(requireContext(), HistoryActivity::class.java)) }
         binding.collectionButton.setOnClickListener { startActivity(Intent(requireContext(), CollectionActivity::class.java)) }
+        binding.proxySettingsButton.setOnClickListener {
+            startActivity(Intent(requireContext(), ProxySettingsActivity::class.java))
+        }
     }
 
     override fun onDestroyView() {

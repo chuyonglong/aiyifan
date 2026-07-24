@@ -20,19 +20,24 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.fragmentContainer.applySystemBarsPadding(left = true, top = true, right = true)
-        binding.bottomNav.applySystemBarsPadding(left = true, right = true, bottom = true, growHeight = true)
+        binding.bottomTabs.applySystemBarsPadding(left = true, right = true, bottom = true, growHeight = true)
 
         if (savedInstanceState == null) {
             show(HomeFragment())
         }
-        binding.bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> show(HomeFragment())
-                R.id.nav_hot -> show(HotFragment())
-                R.id.nav_mine -> show(MineFragment())
+        binding.bottomTabs.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) {
+                when (tab.position) {
+                    0 -> show(HomeFragment())
+                    1 -> show(HotFragment())
+                    2 -> show(MineFragment())
+                }
             }
-            true
-        }
+
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) = Unit
+
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) = Unit
+        })
     }
 
     private fun show(fragment: Fragment) {

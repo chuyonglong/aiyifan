@@ -30,6 +30,17 @@ class VideoPlayerLayoutTest {
         assertEquals("@color/text_primary", viewWithId(document, "shareButton")!!.getAttribute("android:textColor"))
     }
 
+    @Test
+    fun `detail top bar is light and full screen exit button overlays the player`() {
+        val document = videoPlayerLayout()
+        val topBar = viewWithId(document, "playerTopBar")!!
+        val playerContainer = viewWithId(document, "playerContainer")!!
+
+        assertEquals("@color/surface", topBar.getAttribute("android:background"))
+        assertEquals("@color/text_primary", viewWithId(topBar, "backButton")!!.getAttribute("android:textColor"))
+        assertEquals("fullscreenExitButton", viewWithId(playerContainer, "fullscreenExitButton")!!.idName())
+    }
+
     private fun videoPlayerLayout() = DocumentBuilderFactory.newInstance()
         .newDocumentBuilder()
         .parse(layoutFile())

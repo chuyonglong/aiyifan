@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.children
 import androidx.core.view.setMargins
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -54,8 +55,8 @@ class HomeFragment : Fragment() {
                 }
                 val categories = repository.getCategories()
                 val category = categories.firstOrNull { it.id == selectedCategory?.id } ?: categories.first()
-                renderCategories(categories)
                 selectedCategory = category
+                renderCategories(categories)
                 adapter.submitList(repository.getHomeVideos(category.id))
             } catch (exception: Throwable) {
                 if (exception is CancellationException) throw exception
@@ -72,11 +73,13 @@ class HomeFragment : Fragment() {
     private fun renderCategories(categories: List<Category>) {
         binding.categoryContainer.removeAllViews()
         categories.forEach { category ->
+            val appearance = HomeCategoryAppearance.forSelection(category.id == selectedCategory?.id)
             val tab = TextView(requireContext()).apply {
                 text = category.name
                 textSize = 14f
-                setTextColor(resources.getColor(R.color.text_primary, null))
-                setBackgroundResource(R.drawable.bg_chip)
+                tag = category.id
+                setTextColor(resources.getColor(appearance.textColorRes, null))
+                setBackgroundResource(appearance.backgroundRes)
                 val params = ViewGroup.MarginLayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -91,6 +94,11 @@ class HomeFragment : Fragment() {
 
     private fun selectCategory(category: Category) {
         selectedCategory = category
+        binding.categoryContainer.children.forEach { tab ->
+            val appearance = HomeCategoryAppearance.forSelection(tab.tag == category.id)
+            tab.setBackgroundResource(appearance.backgroundRes)
+            (tab as TextView).setTextColor(resources.getColor(appearance.textColorRes, null))
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             runCatching { repository.getHomeVideos(category.id) }
                 .onSuccess { videos -> adapter.submitList(videos) }

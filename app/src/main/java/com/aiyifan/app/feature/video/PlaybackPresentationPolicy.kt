@@ -1,5 +1,6 @@
 package com.aiyifan.app.feature.video
 
+import android.view.View
 enum class PlaybackDestination {
     PICTURE_IN_PICTURE,
     OVERLAY,
@@ -37,4 +38,9 @@ object VideoPlayerBackBehavior {
         canMinimizeInApp -> VideoPlayerBackAction.MINIMIZE_TO_IN_APP_PLAYER
         else -> VideoPlayerBackAction.NAVIGATE_UP
     }
+}
+
+object FullScreenControlVisibility {
+    fun shouldShowExitButton(isFullScreen: Boolean, controllerVisibility: Int): Boolean =
+        isFullScreen && controllerVisibility == View.VISIBLE
 }

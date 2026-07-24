@@ -22,6 +22,8 @@ import androidx.core.view.isVisible
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.aiyifan.app.R
@@ -48,10 +50,12 @@ class VideoPlayerActivity : AppCompatActivity() {
     private var isInAppMiniPlayerVisible = false
     private var restoreMiniPlayerOnStart = false
     private var pendingFloatingRecoveryPositionMs: Long? = null
+    private var controllerVisibility = View.GONE
 
+    @UnstableApi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setupEdgeToEdge(lightSystemBars = false)
+        setupEdgeToEdge()
         binding = ActivityVideoPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.pageContent.applySystemBarsPadding(left = true, right = true, bottom = true)
@@ -59,6 +63,13 @@ class VideoPlayerActivity : AppCompatActivity() {
 
         binding.backButton.setOnClickListener { handleBack() }
         binding.fullScreenButton.setOnClickListener { setFullScreen(!isFullScreen) }
+        binding.fullscreenExitButton.setOnClickListener { setFullScreen(false) }
+        binding.playerView.setControllerVisibilityListener(
+            PlayerView.ControllerVisibilityListener { controllerVisibility ->
+                this.controllerVisibility = controllerVisibility
+                updateFullScreenExitButton()
+            },
+        )
         binding.floatingWindowButton.setOnClickListener { showFloatingPresentation() }
         binding.inAppMiniPlayPauseButton.setOnClickListener {
             playbackController.togglePlayPause()
@@ -101,11 +112,11 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun loadDetail(mediaKey: String) {
         if (mediaKey.isBlank()) {
-            Toast.makeText(this, "Video not found", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.video_not_found, Toast.LENGTH_SHORT).show()
             finish()
             return
         }
-        binding.title.text = "Loading..."
+        binding.title.setText(R.string.video_loading)
         lifecycleScope.launch {
             runCatching { AppGraph.catalogRepository.getVideoDetail(mediaKey) }
                 .onSuccess { loadedDetail ->
@@ -118,7 +129,7 @@ class VideoPlayerActivity : AppCompatActivity() {
                     }
                 }
                 .onFailure {
-                    Toast.makeText(this@VideoPlayerActivity, "Failed to load detail", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@VideoPlayerActivity, R.string.video_detail_load_failed, Toast.LENGTH_SHORT).show()
                     finish()
                 }
         }
@@ -130,28 +141,30 @@ class VideoPlayerActivity : AppCompatActivity() {
             detail.typeName,
             detail.publishTime,
             detail.updateMsg,
-            "Plays ${detail.playCount}",
+            getString(R.string.video_play_count, detail.playCount),
         ).joinToString(" / ")
-        binding.intro.text = buildString {
-            append("Director: ")
-            append(detail.director.orEmpty())
-            append('\n')
-            append("Cast: ")
-            append(detail.actor.orEmpty())
-            append('\n')
-            append(detail.introduce.orEmpty())
-        }
-        binding.favoriteButton.text = if (AppGraph.catalogRepository.isFavorite(detail.mediaKey)) "Favorited" else "Favorite"
+        binding.intro.text = listOfNotNull(
+            detail.director?.takeIf(String::isNotBlank)?.let { getString(R.string.video_director, it) },
+            detail.actor?.takeIf(String::isNotBlank)?.let { getString(R.string.video_cast, it) },
+            detail.introduce?.takeIf(String::isNotBlank),
+        ).joinToString("\n")
+        binding.favoriteButton.setText(
+            if (AppGraph.catalogRepository.isFavorite(detail.mediaKey)) R.string.video_favorited else R.string.video_favorite,
+        )
         binding.favoriteButton.setOnClickListener {
             val isFavorite = AppGraph.catalogRepository.toggleFavorite(detail)
-            binding.favoriteButton.text = if (isFavorite) "Favorited" else "Favorite"
-            Toast.makeText(this, if (isFavorite) "Added to favorites" else "Removed from favorites", Toast.LENGTH_SHORT).show()
+            binding.favoriteButton.setText(if (isFavorite) R.string.video_favorited else R.string.video_favorite)
+            Toast.makeText(
+                this,
+                if (isFavorite) R.string.video_favorite_added else R.string.video_favorite_removed,
+                Toast.LENGTH_SHORT,
+            ).show()
         }
         binding.shareButton.setOnClickListener {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, detail.title)
-            }, "Share"))
+            }, getString(R.string.video_share_chooser)))
         }
 
         val relatedAdapter = VideoListAdapter { video ->
@@ -170,8 +183,8 @@ class VideoPlayerActivity : AppCompatActivity() {
             detail.typeName,
             detail.publishTime,
             detail.updateMsg,
-            "Plays ${detail.playCount}",
-            "Loading stream",
+            getString(R.string.video_play_count, detail.playCount),
+            getString(R.string.video_stream_loading),
         ).joinToString(" / ")
         lifecycleScope.launch {
             runCatching { AppGraph.catalogRepository.resolvePlayback(detail, episode) }
@@ -182,18 +195,18 @@ class VideoPlayerActivity : AppCompatActivity() {
                         pendingFloatingRecoveryPositionMs = null
                         attachPlayerToCurrentSurface()
                     } else {
-                        Toast.makeText(this@VideoPlayerActivity, "No playable stream", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@VideoPlayerActivity, R.string.video_no_playable_stream, Toast.LENGTH_SHORT).show()
                     }
                     binding.meta.text = listOfNotNull(
                         detail.typeName,
                         detail.publishTime,
                         detail.updateMsg,
-                        "Plays ${detail.playCount}",
+                        getString(R.string.video_play_count, detail.playCount),
                         playableEpisode.resolution?.let { "${it}P" },
                     ).joinToString(" / ")
                 }
                 .onFailure {
-                    Toast.makeText(this@VideoPlayerActivity, "Failed to load stream", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@VideoPlayerActivity, R.string.video_stream_load_failed, Toast.LENGTH_SHORT).show()
                 }
         }
     }
@@ -235,12 +248,20 @@ class VideoPlayerActivity : AppCompatActivity() {
             if (enabled) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
         }
         binding.playerTopBar.isVisible = !enabled
+        updateFullScreenExitButton()
         binding.contentScroll.isVisible = !enabled && !isInAppMiniPlayerVisible
         (binding.playerContainer.layoutParams as LinearLayout.LayoutParams).apply {
             height = if (enabled) 0 else dpToPx(NORMAL_PLAYER_HEIGHT_DP)
             weight = if (enabled) 1f else 0f
             binding.playerContainer.layoutParams = this
         }
+    }
+
+    private fun updateFullScreenExitButton() {
+        binding.fullscreenExitButton.isVisible = FullScreenControlVisibility.shouldShowExitButton(
+            isFullScreen = isFullScreen,
+            controllerVisibility = controllerVisibility,
+        )
     }
 
     override fun onUserLeaveHint() {

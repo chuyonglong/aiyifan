@@ -16,7 +16,7 @@
             android:id="@+id/playerTopBar"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="@drawable/bg_player"
+            android:background="@color/surface"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -26,7 +26,7 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:text="返回"
-                android:textColor="@color/white"
+                android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 
             <View
@@ -41,7 +41,8 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="开启悬浮窗"
                 android:padding="12dp"
-                android:src="@drawable/ic_picture_in_picture" />
+                android:src="@drawable/ic_picture_in_picture"
+                app:tint="@color/text_primary" />
 
             <ImageButton
                 android:id="@+id/fullScreenButton"
@@ -50,7 +51,8 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="全屏播放"
                 android:padding="12dp"
-                android:src="@drawable/ic_fullscreen" />
+                android:src="@drawable/ic_fullscreen"
+                app:tint="@color/text_primary" />
         </LinearLayout>
 
         <FrameLayout
@@ -65,6 +67,18 @@
                 android:layout_height="match_parent"
                 app:show_buffering="when_playing"
                 app:use_controller="true" />
+
+            <ImageButton
+                android:id="@+id/fullscreenExitButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="12dp"
+                android:background="@drawable/bg_floating_control"
+                android:contentDescription="退出全屏"
+                android:padding="12dp"
+                android:src="@drawable/ic_fullscreen_exit"
+                android:visibility="gone" />
         </FrameLayout>
 
         <ScrollView

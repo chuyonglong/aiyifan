@@ -18,7 +18,7 @@ object TripDataHomeParser {
         return buildList {
             for (index in 0 until sections.length()) {
                 val section = sections.optJSONObject(index) ?: continue
-                val name = section.optString("name").trim()
+                val name = section.optionalRemoteText("name").orEmpty()
                 val videos = parseVideos(section.optJSONArray("list"))
                 if (name.isNotBlank() && videos.isNotEmpty()) {
                     add(TripDataHomeSection(name = name, videos = videos))
@@ -32,30 +32,33 @@ object TripDataHomeParser {
             if (items == null) return@buildList
             for (index in 0 until items.length()) {
                 val item = items.optJSONObject(index) ?: continue
-                val mediaKey = item.optString("mediaKey").trim()
+                val mediaKey = item.optionalRemoteText("mediaKey").orEmpty()
                 if (mediaKey.isBlank()) continue
                 val videoType = item.optInt("videoType", item.optInt("type", 0))
                 if (videoType == 3) continue
-                val publishTime = item.optString("publishTime").trim()
+                val publishTime = item.optionalRemoteText("publishTime").orEmpty()
                 add(
                     VideoSummary(
                         mediaKey = mediaKey,
-                        episodeKey = item.optString("episodeKey").trim().ifBlank { null },
-                        title = item.optString("title").trim(),
-                        coverUrl = item.optString("coverImgUrl").trim(),
+                        episodeKey = item.optionalRemoteText("episodeKey"),
+                        title = item.optionalRemoteText("title").orEmpty(),
+                        coverUrl = item.optionalRemoteText("coverImgUrl").orEmpty(),
                         videoType = videoType,
-                        contentType = item.optString("contentType").trim().ifBlank { null },
-                        mediaType = item.optString("mediaType").trim().ifBlank { null },
-                        score = item.optString("score").trim().ifBlank { null },
+                        contentType = item.optionalRemoteText("contentType"),
+                        mediaType = item.optionalRemoteText("mediaType"),
+                        score = item.optionalRemoteText("score"),
                         playCount = item.optInt("playCount"),
-                        updateStatus = item.optString("updateStatus").trim().ifBlank { null },
-                        duration = item.optString("duration").trim().ifBlank { null },
+                        updateStatus = item.optionalRemoteText("updateStatus"),
+                        duration = item.optionalRemoteText("duration"),
                         year = publishTime.takeIf { it.length >= 4 }?.substring(0, 4),
-                        area = item.optString("regional").trim().ifBlank { null },
-                        actor = item.optString("actor").trim().ifBlank { null },
-                        director = item.optString("director").trim().ifBlank { null },
+                        area = item.optionalRemoteText("regional"),
+                        actor = item.optionalRemoteText("actor"),
+                        director = item.optionalRemoteText("director"),
                     ),
                 )
             }
         }
+
+    private fun JSONObject.optionalRemoteText(key: String): String? =
+        RemoteTextNormalizer.optional(optString(key))
 }

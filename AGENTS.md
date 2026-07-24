@@ -32,7 +32,7 @@ fun `resolver falls back to default config when country file is missing`()
 
 ## 提交与 Pull Request
 
-沿用已有提交习惯：使用 `feat(app): ...`、`docs: ...` 等 Conventional Commit 前缀，或简短清晰的中文摘要。每个提交保持单一目的。PR 应说明改动目的、执行过的验证命令和关联问题；修改布局、颜色、图标或交互时附模拟器截图，并点明测试设备或 API 级别。
+沿用已有提交习惯：使用 `feat(app): ...`、`docs: ...` 等 Conventional Commit 前缀，或简短清晰的中文摘要。每个提交保持单一目的。PR 应说明改动目的、执行过的验证命令和关联问题；修改布局、颜色、图标或交互时附模拟器截图，并点明测试设备或 API 级别。提交记录改为中文
 
 ## 资源与配置
 

@@ -3,6 +3,7 @@ package com.aiyifan.app.feature.video
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -14,6 +15,18 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class VideoPlayerManifestTest {
+    @Test
+    fun appDeclaresVideoPresentationPermissions() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val packageInfo = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_PERMISSIONS,
+        )
+
+        val declaredPermissions = packageInfo.requestedPermissions.orEmpty().toSet()
+        assertTrue(declaredPermissions.containsAll(VIDEO_PRESENTATION_PERMISSIONS))
+    }
+
     @Test
     @SdkSuppress(minSdkVersion = 26)
     fun videoPlayerDeclaresPictureInPictureSupport() {
@@ -41,5 +54,11 @@ class VideoPlayerManifestTest {
     private companion object {
         // This platform flag is hidden from the public Android SDK but is set by the manifest parser.
         const val FLAG_SUPPORTS_PICTURE_IN_PICTURE = 0x00400000
+
+        val VIDEO_PRESENTATION_PERMISSIONS = setOf(
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+            "android.permission.SYSTEM_ALERT_WINDOW",
+        )
     }
 }

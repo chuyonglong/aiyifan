@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +15,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class VideoPlayerManifestTest {
     @Test
+    @SdkSuppress(minSdkVersion = 26)
     fun videoPlayerDeclaresPictureInPictureSupport() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val info = context.packageManager.getActivityInfo(
@@ -25,6 +27,7 @@ class VideoPlayerManifestTest {
     }
 
     @Test
+    @SdkSuppress(minSdkVersion = 29)
     fun floatingPlayerServiceDeclaresMediaPlaybackForegroundType() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val info = context.packageManager.getServiceInfo(

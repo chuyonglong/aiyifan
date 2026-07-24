@@ -8,7 +8,7 @@ import org.junit.Test
 
 class ProxySubscriptionParserTest {
 
-    private val parser = ProxySubscriptionParser()
+    private val parser = ProxySubscriptionParser(::decodeWithJvmBase64)
 
     @Test
     fun `parser imports a standard base64 VLESS node`() {
@@ -97,6 +97,20 @@ class ProxySubscriptionParserTest {
     }
 
     @Test
+    fun `parser reads VMess endpoint fields from an URL-safe payload without padding`() {
+        val payload = Base64.getUrlEncoder().withoutPadding().encodeToString(
+            """{"add":"vmess.example.com","port":"443","ps":"VMess Tokyo"}""".toByteArray(),
+        )
+
+        val result = parser.parse(encode("vmess://$payload"))
+
+        val node = (result as SubscriptionImportResult.Imported).nodes.single()
+        assertEquals(ProxyProtocol.VMESS, node.protocol)
+        assertEquals("vmess.example.com", node.host)
+        assertEquals(443, node.port)
+    }
+
+    @Test
     fun `parser does not expose credential material through results`() {
         val uuid = "123e4567-e89b-12d3-a456-426614174000"
         val password = "top-secret-password"
@@ -108,4 +122,12 @@ class ProxySubscriptionParserTest {
     }
 
     private fun encode(value: String): String = Base64.getEncoder().encodeToString(value.toByteArray())
+
+    private fun decodeWithJvmBase64(encoded: String, urlSafe: Boolean): ByteArray? = runCatching {
+        if (urlSafe) {
+            Base64.getUrlDecoder().decode(encoded)
+        } else {
+            Base64.getDecoder().decode(encoded)
+        }
+    }.getOrNull()
 }

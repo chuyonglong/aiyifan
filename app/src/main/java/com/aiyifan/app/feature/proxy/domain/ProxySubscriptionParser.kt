@@ -1,7 +1,7 @@
 package com.aiyifan.app.feature.proxy.domain
 
+import android.util.Base64
 import java.net.URI
-import java.util.Base64
 import java.util.UUID
 import org.json.JSONObject
 
@@ -16,7 +16,9 @@ enum class SubscriptionImportError {
     NO_SUPPORTED_NODES,
 }
 
-class ProxySubscriptionParser {
+class ProxySubscriptionParser(
+    private val decodeBase64Bytes: (encoded: String, urlSafe: Boolean) -> ByteArray? = ::decodeWithAndroidBase64,
+) {
 
     fun parse(subscription: String): SubscriptionImportResult {
         if (subscription.isBlank()) {
@@ -36,9 +38,8 @@ class ProxySubscriptionParser {
 
     private fun decodeBase64(subscription: String): String? {
         val encoded = subscription.filterNot(Char::isWhitespace)
-        val bytes = runCatching { Base64.getDecoder().decode(encoded) }
-            .recoverCatching { Base64.getUrlDecoder().decode(encoded) }
-            .getOrNull()
+        val bytes = decodeBase64Bytes(encoded, false)
+            ?: decodeBase64Bytes(encoded, true)
             ?: return null
         return runCatching { bytes.toString(Charsets.UTF_8) }.getOrNull()
     }
@@ -92,4 +93,9 @@ class ProxySubscriptionParser {
             serializedNode = rawNode,
         )
     }
+}
+
+private fun decodeWithAndroidBase64(encoded: String, urlSafe: Boolean): ByteArray? {
+    val flags = Base64.NO_WRAP or if (urlSafe) Base64.URL_SAFE else 0
+    return runCatching { Base64.decode(encoded, flags) }.getOrNull()
 }

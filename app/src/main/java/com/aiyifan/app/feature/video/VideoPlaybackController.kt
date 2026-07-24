@@ -44,6 +44,9 @@ class VideoPlaybackController(
     val isPrepared: Boolean
         get() = !released && activeDetail != null && activeEpisode != null
 
+    val isReleased: Boolean
+        get() = released
+
     val isPlaying: Boolean
         get() = isPrepared && engine.isPlaying
 
@@ -109,6 +112,20 @@ class VideoPlaybackController(
                 session = Media3PlaybackSession(session),
             )
         }
+    }
+}
+
+class VideoPlaybackControllerProvider(
+    private val createController: () -> VideoPlaybackController,
+) {
+    private var controller: VideoPlaybackController? = null
+
+    @Synchronized
+    fun get(): VideoPlaybackController {
+        val activeController = controller
+        if (activeController != null && !activeController.isReleased) return activeController
+
+        return createController().also { controller = it }
     }
 }
 

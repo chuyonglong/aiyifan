@@ -5,6 +5,7 @@ import com.aiyifan.app.core.model.Episode
 import com.aiyifan.app.core.model.VideoDetail
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,6 +22,23 @@ class VideoPlaybackControllerTest {
 
         assertEquals(1, engine.releaseCalls)
         assertEquals(1, session.releaseCalls)
+    }
+
+    @Test
+    fun `provider recreates a controller after its cached controller is released`() {
+        val engines = mutableListOf<FakePlaybackEngine>()
+        val provider = VideoPlaybackControllerProvider {
+            FakePlaybackEngine().also(engines::add).let { engine ->
+                VideoPlaybackController(engine, FakeCatalogRepository(), FakePlaybackSession())
+            }
+        }
+
+        val releasedController = provider.get()
+        releasedController.release()
+        val recreatedController = provider.get()
+
+        assertNotSame(releasedController, recreatedController)
+        assertEquals(1, engines.first().releaseCalls)
     }
 
     @Test
